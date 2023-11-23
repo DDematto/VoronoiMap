@@ -1,7 +1,7 @@
 // @author Devin DeMatto \n I am just trying out some silly stuff :P
 
-#include <delaunator.hpp>
 #include "UVoronoiGen.h"
+#include <delaunator.hpp>
 #include "VectorUtil.h"
 
 UVoronoiGen::UVoronoiGen()
