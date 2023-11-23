@@ -2,9 +2,12 @@
 
 #pragma once
 
-#include <jc_voronoi.h>
 #include "CoreMinimal.h"
 #include "UVoronoiGen.generated.h"
+
+namespace delaunator {
+	class Delaunator;
+}
 
 ///
 /// GRAPH STRUCTURE
@@ -17,6 +20,7 @@ USTRUCT(BlueprintType)
 struct FDelaunayNode
 {
 	GENERATED_BODY()
+
 
 	// Indices of vertices forming the triangle
 	UPROPERTY(BlueprintReadOnly)
@@ -82,8 +86,12 @@ class VORONOIMAP_API UVoronoiGen : public UObject
 
 private:
 
-	void BuildVoronoiGraph(const jcv_diagram* diagram);
-	void RelateGraphs();
+	TArray<double> GeneratePoints() const;
+	void BuildDelaunayGraph(const delaunator::Delaunator& D);
+	void BuildVoronoiGraph(const delaunator::Delaunator& D);
+	static FVector ComputeCircumcenter(const FVector& P1, const FVector& P2, const FVector& P3);
+	void RelateGraphs(const delaunator::Delaunator& D);
+	static size_t FindTriangleContainingPoint(const delaunator::Delaunator& D, size_t PointIndex);
 
 public:
 	/// Constructor
@@ -95,27 +103,24 @@ public:
 
 	/// Width of Map
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voronoi Settings")
-	int mWidth = 500;
+	int MWidth = 500;
 
 	/// Height of Map
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voronoi Settings")
-	int mHeight = 500;
+	int MHeight = 500;
 
 	/// Resolution of Map
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voronoi Settings")
-	int mResolution = 100;
+	int MResolution = 100;
 
 	// Delaunay Graph Instance
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voronoi Data")
-	FDelaunayGraph mDelaunayGraph;
+	FDelaunayGraph MDelaunayGraph;
 
 	// Voronoi Graph Instance
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Voronoi Data")
-	FVoronoiGraph mVoronoiGraph;
+	FVoronoiGraph MVoronoiGraph;
 
 	UFUNCTION(BlueprintCallable, Category = "Voronoi Generation")
 	void Generate();
-
-	/// Generate Coordinates for Map Generation
-	TArray<double> GeneratePoints();
 };
