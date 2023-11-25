@@ -31,7 +31,6 @@ public:
 	class UButton* GenerateButton;
 
 
-
 	// Functions to handle slider value changes and button click
 	UFUNCTION(BlueprintCallable, Category = "Voronoi")
 	void SetHeight(float Height);
@@ -45,6 +44,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Voronoi")
 	void GenerateVoronoi();
 
+	UFUNCTION(BlueprintCallable, Category = "Voronoi Data")
+	FDelaunayGraph GetDelaunayGraph() { return VoronoiGenerator->MDelaunayGraph; }
+
+	UFUNCTION(BlueprintCallable, Category = "Voronoi Data")
+	FVoronoiGraph GetVoronoiGraph() { return VoronoiGenerator->MVoronoiGraph; }
+
+	UFUNCTION(BlueprintCallable, Category = "Voronoi Data")
+	TArray<FVector> GetOriginalPoints() { return VoronoiGenerator->MOriginalPoints; }
 protected:
 	virtual void NativeConstruct() override;
 };

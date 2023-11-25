@@ -12,20 +12,7 @@ UVoronoiGen::~UVoronoiGen()
 {
 }
 
-TArray<double> UVoronoiGen::GeneratePoints() const
-{
-	TArray<double> Coords;
-	for (int i = 0; i < MResolution; ++i)
-	{
-		double x = FMath::RandRange(0, MWidth);
-		double y = FMath::RandRange(0, MHeight);
-		Coords.Add(x);
-		Coords.Add(y);
-	}
-
-	return Coords;
-}
-
+// Main Generation Function
 void UVoronoiGen::Generate()
 {
 	// Generate Random Points for Map
@@ -40,48 +27,116 @@ void UVoronoiGen::Generate()
 
 	// Build Voronoi Graph from Delaunay Triangulation
 	BuildVoronoiGraph(d);
-
-	// Relate Two Graphs
-	RelateGraphs(d);
 }
+
+// May Do a different generation algorithm later to remove clustering effect
+TArray<double> UVoronoiGen::GeneratePoints()
+{
+	TArray<double> Coords;
+	MOriginalPoints.Empty();
+
+	for (int i = 0; i < MResolution; ++i)
+	{
+		double x = FMath::RandRange(0, MWidth);
+		double y = FMath::RandRange(0, MHeight);
+		Coords.Add(x);
+		Coords.Add(y);
+
+		MOriginalPoints.Add(FVector(x, y, 0));
+	}
+
+	return Coords;
+}
+
+
 
 void UVoronoiGen::BuildDelaunayGraph(const delaunator::Delaunator& D)
 {
-	// Build Delaunay Graph
-	MDelaunayGraph.Triangles.Empty();
+	// Clear any existing triangles
+	MDelaunayGraph.Triangles.Empty(D.triangles.size() / 3);
+
+	// Resize the Triangles array to accommodate all triangles
+	MDelaunayGraph.Triangles.SetNum(D.triangles.size() / 3);
+
+	// Iterate through all triangles to populate the vertex indices
 	for (size_t i = 0; i < D.triangles.size(); i += 3)
 	{
-		FDelaunayNode Node;
-		Node.VertexIndices = {
+		MDelaunayGraph.Triangles[i / 3].VertexIndices = {
 			static_cast<int32>(D.triangles[i]),
 			static_cast<int32>(D.triangles[i + 1]),
 			static_cast<int32>(D.triangles[i + 2])
 		};
-		MDelaunayGraph.Triangles.Add(Node);
+	}
+
+	// Populate adjacency information
+	for (size_t i = 0; i < D.triangles.size(); i += 3)
+	{
+		FDelaunayNode& CurrentNode = MDelaunayGraph.Triangles[i / 3];
+
+		// Half-edges are opposite to the triangle point, e.g., halfedge 0 is opposite to point 0
+		for (size_t j = 0; j < 3; j++)
+		{
+			// Delaunator's 'halfedges' array contains the opposite half-edge for each edge
+			size_t OppositeHalfEdge = D.halfedges[i + j];
+
+			if (OppositeHalfEdge == delaunator::INVALID_INDEX)
+			{
+				// This edge is on the convex hull and has no adjacent triangle
+				CurrentNode.AdjacentTrianglesIndices.Add(-1); // Use -1 or another sentinel value to indicate 'no neighbor'
+			}
+			else
+			{
+				// The triangle opposite to this edge is found by dividing the half-edge index by 3
+				size_t AdjacentTriangle = OppositeHalfEdge / 3;
+				CurrentNode.AdjacentTrianglesIndices.Add(static_cast<int32>(AdjacentTriangle));
+			}
+		}
 	}
 }
 
 void UVoronoiGen::BuildVoronoiGraph(const delaunator::Delaunator& D)
 {
-	// Clear existing Voronoi graph
 	MVoronoiGraph.Vertices.Empty();
 
-	// Iterate over Delaunay triangles and compute Voronoi vertices (circumcenters)
-	for (std::size_t i = 0; i < D.triangles.size(); i += 3)
-	{
-		// Get the points of the triangle
-		FVector P1 = FVector(D.coords[2 * D.triangles[i]], D.coords[2 * D.triangles[i] + 1], 0);
-		FVector P2 = FVector(D.coords[2 * D.triangles[i + 1]], D.coords[2 * D.triangles[i + 1] + 1], 0);
-		FVector P3 = FVector(D.coords[2 * D.triangles[i + 2]], D.coords[2 * D.triangles[i + 2] + 1], 0);
+	// Define the bounding box for capping infinite edges
+	FVector boundingBoxMin(0, 0, 0);
+	FVector boundingBoxMax(MWidth, MHeight, 0);
 
-		// Add the circumcenter as a vertex in the Voronoi graph
+	// Compute Voronoi vertices (circumcenters of Delaunay triangles)
+	for (size_t i = 0; i < D.triangles.size(); i += 3)
+	{
+		FVector P1(D.coords[2 * D.triangles[i]], D.coords[2 * D.triangles[i] + 1], 0);
+		FVector P2(D.coords[2 * D.triangles[i + 1]], D.coords[2 * D.triangles[i + 1] + 1], 0);
+		FVector P3(D.coords[2 * D.triangles[i + 2]], D.coords[2 * D.triangles[i + 2] + 1], 0);
+
 		FVoronoiNode Node;
 		Node.Position = ComputeCircumcenter(P1, P2, P3);
-		// ... You'll also need to fill in the adjacency information here
 		MVoronoiGraph.Vertices.Add(Node);
 	}
 
-	// ... Further processing to establish edges and handle infinite edges
+	// Determine adjacency of Voronoi vertices using Delaunay triangle adjacency
+	for (int32 i = 0; i < MDelaunayGraph.Triangles.Num(); ++i)
+	{
+		const FDelaunayNode& DelaunayTriangle = MDelaunayGraph.Triangles[i];
+		FVector circumcenter = MVoronoiGraph.Vertices[i].Position;
+
+		for (int32 AdjacentTriangleIndex : DelaunayTriangle.AdjacentTrianglesIndices)
+		{
+			if (AdjacentTriangleIndex >= 0)
+			{
+				MVoronoiGraph.Vertices[i].AdjacentVerticesIndices.AddUnique(AdjacentTriangleIndex);
+			}
+			else
+			{
+				// Add the intersection point as a new Voronoi vertex
+				FVoronoiNode BoundaryNode;
+				int32 newVertexIndex = MVoronoiGraph.Vertices.Add(BoundaryNode);
+
+				// Connect the current node to the new boundary node
+				MVoronoiGraph.Vertices[i].AdjacentVerticesIndices.AddUnique(newVertexIndex);
+			}
+		}
+	}
 }
 
 FVector UVoronoiGen::ComputeCircumcenter(const FVector& P1, const FVector& P2, const FVector& P3)
@@ -92,52 +147,8 @@ FVector UVoronoiGen::ComputeCircumcenter(const FVector& P1, const FVector& P2, c
 	const UE::Geometry::TVector2<float> C(P3.X, P3.Y);
 
 	// Calculate circumcenter
-	const auto Circumcenter = UE::Geometry::VectorUtil::Circumcenter(A, B, C, KINDA_SMALL_NUMBER);
+	const auto Circumcenter = UE::Geometry::VectorUtil::Circumcenter(A, B, C);
 
 	// Convert back to FVector
 	return FVector(Circumcenter.X, Circumcenter.Y, 0);
 }
-
-void UVoronoiGen::RelateGraphs(const delaunator::Delaunator& D)
-{
-	// Assumption: MVoronoiGraph.Vertices and MDelaunayGraph.Triangles are populated
-	// and correspond to each other in order: the i-th Voronoi vertex corresponds to
-	// the circumcenter of the i-th Delaunay triangle.
-
-	for (size_t i = 0; i < D.triangles.size(); i += 3)
-	{
-		FDelaunayNode& DelaunayNode = MDelaunayGraph.Triangles[i / 3];
-		auto& [Position, AdjacentVerticesIndices] = MVoronoiGraph.Vertices[i / 3];
-
-		// Iterate over the 3 edges of the triangle
-		for (size_t j = 0; j < 3; ++j)
-		{
-			const size_t EdgeIndex = i + j;
-			const size_t OppositePointIndex = D.triangles[D.halfedges[EdgeIndex]];
-
-			// Check for valid opposite point index
-			if (OppositePointIndex != delaunator::INVALID_INDEX)
-			{
-				// Find the triangle that contains the oppositePoint as a vertex.
-				const size_t AdjacentTriangleIndex = FindTriangleContainingPoint(D, OppositePointIndex);
-
-				// Add adjacency information to the Voronoi node.
-				AdjacentVerticesIndices.AddUnique(AdjacentTriangleIndex);
-			}
-			// Else, handle infinite edges or boundary conditions as needed
-		}
-	}
-}
-
-size_t UVoronoiGen::FindTriangleContainingPoint(const delaunator::Delaunator& D, const size_t PointIndex)
-{
-	for (size_t i = 0; i < D.triangles.size(); i += 3)
-	{
-		if (D.triangles[i] == PointIndex || D.triangles[i + 1] == PointIndex || D.triangles[i + 2] == PointIndex)
-		{
-			return i / 3;
-		}
-	}
-	return delaunator::INVALID_INDEX; // or a sentinel value indicating an error
-}
-

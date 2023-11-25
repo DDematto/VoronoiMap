@@ -16,8 +16,11 @@ namespace delaunator {
 /**
 * Node that Describes Triangles
 */
+USTRUCT(BlueprintType)
 struct FDelaunayNode
 {
+	GENERATED_BODY()
+
 	// Indices of vertices forming the triangle
 	TArray<int32> VertexIndices;
 
@@ -29,28 +32,52 @@ struct FDelaunayNode
 /**
 * Graph that Describes Triangles
 */
+USTRUCT(BlueprintType)
 struct FDelaunayGraph
 {
+	GENERATED_BODY()
+
 	TArray<FDelaunayNode> Triangles;
 };
 
-/**
-* Node that Describes Voronoi Node
-*/
+USTRUCT(BlueprintType)
 struct FVoronoiNode
 {
-	FVector Position;
+	GENERATED_BODY()
+
+	FVector Position; // Position of the Voronoi node.
 
 	// Using indices for adjacency to be Blueprint-friendly
 	TArray<int32> AdjacentVerticesIndices;
 };
 
-/**
-* Graph that Describes Voronoi
-*/
+
+USTRUCT(BlueprintType)
 struct FVoronoiGraph
 {
-	TArray<FVoronoiNode> Vertices;
+	GENERATED_BODY()
+
+	TArray<FVoronoiNode> Vertices; // Existing vertices.
+};
+
+
+struct FDelaunayEdge
+{
+	int32 A, B;
+
+	FDelaunayEdge(int32 InA, int32 InB) : A(InA), B(InB) {}
+
+	// Ensure that edge (A, B) is equal to edge (B, A)
+	bool operator==(const FDelaunayEdge& Other) const
+	{
+		return (A == Other.A && B == Other.B) || (A == Other.B && B == Other.A);
+	}
+
+	// Custom hash function
+	friend uint32 GetTypeHash(const FDelaunayEdge& Edge)
+	{
+		return GetTypeHash(Edge.A) ^ GetTypeHash(Edge.B);
+	}
 };
 
 ///
@@ -66,14 +93,17 @@ class VORONOIMAP_API UVoronoiGen : public UObject
 	GENERATED_BODY()
 
 private:
+	// Generates Random Points in Range of Width and Height, stores in Original Points
+	TArray<double> GeneratePoints();
 
-	TArray<double> GeneratePoints() const;
+	// Builds the Delauny Graph given data from delaunator
 	void BuildDelaunayGraph(const delaunator::Delaunator& D);
-	void BuildVoronoiGraph(const delaunator::Delaunator& D);
-	static FVector ComputeCircumcenter(const FVector& P1, const FVector& P2, const FVector& P3);
-	void RelateGraphs(const delaunator::Delaunator& D);
-	static size_t FindTriangleContainingPoint(const delaunator::Delaunator& D, size_t PointIndex);
 
+	// Builds Voronoi Graph Based on Data from Delaunator
+	void BuildVoronoiGraph(const delaunator::Delaunator& D);
+
+	// Computes Circumference of 3 Points
+	static FVector ComputeCircumcenter(const FVector& P1, const FVector& P2, const FVector& P3);
 public:
 	/// Constructor
 	UVoronoiGen();
@@ -81,15 +111,17 @@ public:
 	/// Destructor
 	~UVoronoiGen();
 
-
 	/// Width of Map
 	int MWidth = 500;
 
 	/// Height of Map
 	int MHeight = 500;
 
-	/// Resolution of Map
+	/// Resolution of Map (Amount of Points to Generate)
 	int MResolution = 100;
+
+	// Array to hold the original points used for triangulation
+	TArray<FVector> MOriginalPoints;
 
 	// Delaunay Graph Instance
 	FDelaunayGraph MDelaunayGraph;
@@ -97,5 +129,6 @@ public:
 	// Voronoi Graph Instance
 	FVoronoiGraph MVoronoiGraph;
 
+	// Main Generation Function
 	void Generate();
 };
