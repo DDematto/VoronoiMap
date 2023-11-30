@@ -64,23 +64,23 @@ int32 UMapEditor::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedG
  */
 void UMapEditor::DrawPoints(const FPaintContext& Context) const
 {
-	// Define the color and size for the points
-	const FLinearColor PointColor = FLinearColor::Red;
-	const FVector2f PointSize(1.0f, 1.0f); // Updated to FVector2f
+	//// Define the color and size for the points
+	//const FLinearColor PointColor = FLinearColor::Red;
+	//const FVector2f PointSize(1.0f, 1.0f); // Updated to FVector2f
 
-	TArray<FVector> Points = MapGenerationInstance->GetPoints();
+	//TArray<FVector> Points = MapGenerationInstance->GetPoints();
 
-	for (const FVector& Point : Points)
-	{
-		// Convert FVector to 2D, assuming Z is ignored for this 2D representation
-		FVector2D PointLocation(Point.X + OFFSET, Point.Y + OFFSET); // Convert to FVector2D
+	//for (const FVector& Point : Points)
+	//{
+	//	// Convert FVector to 2D, assuming Z is ignored for this 2D representation
+	//	FVector2D PointLocation(Point.X + OFFSET, Point.Y + OFFSET); // Convert to FVector2D
 
-		// Create the PaintGeometry for each point
-		FPaintGeometry PaintGeom = Context.AllottedGeometry.ToPaintGeometry(PointLocation, PointSize);
+	//	// Create the PaintGeometry for each point
+	//	FPaintGeometry PaintGeom = Context.AllottedGeometry.ToPaintGeometry(PointLocation, PointSize);
 
-		// Draw each point as a small box
-		FSlateDrawElement::MakeBox(Context.OutDrawElements, Context.LayerId, PaintGeom, FCoreStyle::Get().GetBrush("WhiteBrush"), ESlateDrawEffect::None, PointColor);
-	}
+	//	// Draw each point as a small box
+	//	FSlateDrawElement::MakeBox(Context.OutDrawElements, Context.LayerId, PaintGeom, FCoreStyle::Get().GetBrush("WhiteBrush"), ESlateDrawEffect::None, PointColor);
+	//}
 }
 
 
@@ -89,33 +89,33 @@ void UMapEditor::DrawPoints(const FPaintContext& Context) const
  */
 void UMapEditor::DrawVoronoiEdges(const FPaintContext& Context) const
 {
-	TArray<UMapNode*> Nodes = MapGenerationInstance->GetNodes();
+	//TArray<UMapNode*> Nodes = MapGenerationInstance->GetNodes();
 
-	for (UMapNode* Node : Nodes)
-	{
-		for (int AdjIndex : Node->AdjacentVerticesIndices)
-		{
-			if (AdjIndex < Nodes.Num())
-			{
-				UMapNode* AdjNode = Nodes[AdjIndex];
-				TArray<FVector2D> LinePoints = {
-					FVector2D(Node->Position.X + OFFSET, Node->Position.Y + OFFSET),
-					FVector2D(AdjNode->Position.X + OFFSET, AdjNode->Position.Y + OFFSET)
-				};
+	//for (UMapNode* Node : Nodes)
+	//{
+	//	for (int AdjIndex : Node->AdjacentVerticesIndices)
+	//	{
+	//		if (AdjIndex < Nodes.Num())
+	//		{
+	//			UMapNode* AdjNode = Nodes[AdjIndex];
+	//			TArray<FVector2D> LinePoints = {
+	//				FVector2D(Node->Position.X + OFFSET, Node->Position.Y + OFFSET),
+	//				FVector2D(AdjNode->Position.X + OFFSET, AdjNode->Position.Y + OFFSET)
+	//			};
 
-				FSlateDrawElement::MakeLines(
-					Context.OutDrawElements,
-					Context.LayerId,
-					Context.AllottedGeometry.ToPaintGeometry(),
-					LinePoints,
-					ESlateDrawEffect::None,
-					FLinearColor::Green,
-					true,
-					1.0f
-				);
-			}
-		}
-	}
+	//			FSlateDrawElement::MakeLines(
+	//				Context.OutDrawElements,
+	//				Context.LayerId,
+	//				Context.AllottedGeometry.ToPaintGeometry(),
+	//				LinePoints,
+	//				ESlateDrawEffect::None,
+	//				FLinearColor::Green,
+	//				true,
+	//				1.0f
+	//			);
+	//		}
+	//	}
+	//}
 }
 
 
@@ -124,36 +124,36 @@ void UMapEditor::DrawVoronoiEdges(const FPaintContext& Context) const
  */
 void UMapEditor::DrawDelaunayEdges(const FPaintContext& Context) const
 {
-	if (!MapGenerationInstance.IsValid())
-		return;
+	//if (!MapGenerationInstance.IsValid())
+	//	return;
 
-	TArray<FDelaunay> Triangles = MapGenerationInstance->GetTriangles();
-	TArray<FVector> Points = MapGenerationInstance->GetPoints();
+	//TArray<FDelaunay> Triangles = MapGenerationInstance->GetTriangles();
+	//TArray<FVector> Points = MapGenerationInstance->GetPoints();
 
-	for (const FDelaunay& Triangle : Triangles)
-	{
-		for (int i = 0; i < Triangle.VertexIndices.Num(); ++i)
-		{
-			FVector StartPoint = Points[Triangle.VertexIndices[i]];
-			FVector EndPoint = Points[Triangle.VertexIndices[(i + 1) % Triangle.VertexIndices.Num()]];
+	//for (const FDelaunay& Triangle : Triangles)
+	//{
+	//	for (int i = 0; i < Triangle.VertexIndices.Num(); ++i)
+	//	{
+	//		FVector StartPoint = Points[Triangle.VertexIndices[i]];
+	//		FVector EndPoint = Points[Triangle.VertexIndices[(i + 1) % Triangle.VertexIndices.Num()]];
 
-			TArray<FVector2D> LinePoints = {
-				FVector2D(StartPoint.X + OFFSET, StartPoint.Y + OFFSET),
-				FVector2D(EndPoint.X + OFFSET, EndPoint.Y + OFFSET)
-			};
+	//		TArray<FVector2D> LinePoints = {
+	//			FVector2D(StartPoint.X + OFFSET, StartPoint.Y + OFFSET),
+	//			FVector2D(EndPoint.X + OFFSET, EndPoint.Y + OFFSET)
+	//		};
 
-			FSlateDrawElement::MakeLines(
-				Context.OutDrawElements,
-				Context.LayerId,
-				Context.AllottedGeometry.ToPaintGeometry(),
-				LinePoints,
-				ESlateDrawEffect::None,
-				FLinearColor::Blue,
-				true,
-				1.0f
-			);
-		}
-	}
+	//		FSlateDrawElement::MakeLines(
+	//			Context.OutDrawElements,
+	//			Context.LayerId,
+	//			Context.AllottedGeometry.ToPaintGeometry(),
+	//			LinePoints,
+	//			ESlateDrawEffect::None,
+	//			FLinearColor::Blue,
+	//			true,
+	//			1.0f
+	//		);
+	//	}
+	//}
 }
 
 

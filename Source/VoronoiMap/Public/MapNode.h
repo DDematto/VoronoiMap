@@ -24,6 +24,10 @@ public:
 	/// Destructor
 	~UMapNode();
 
+	// References to Delaunay and Voronoi Edges
+	TArray<UMapEdge*> DelaunayEdges;
+	TArray<UMapEdge*> VoronoiEdges;
+
 	// Node Position
 	FVector Position;
 
@@ -59,37 +63,9 @@ public:
 
 	// Gets edges that form the boundary of the cell
 	TArray<UMapEdge*> GetBoundaryEdges();
+
+	// Method to get corresponding Voronoi/Delaunay edge
+	UMapEdge* GetCorrespondingEdge(UMapEdge* Edge, bool bIsDelaunay);
 };
 
 
-UCLASS()
-class VORONOIMAP_API UMapEdge : public UObject
-{
-	GENERATED_BODY()
-
-public:
-	// Endpoint A
-	UMapNode* NodeA;
-
-	// Endpoint B
-	UMapNode* NodeB;
-
-	// Infinite Edge Indicator
-	bool bIsInfiniteEdge;
-
-	// Length of the Edge
-	float Length;
-
-	// Midpoint of the Edge
-	FVector Midpoint;
-
-	// Direction Vector of the Edge
-	FVector Direction;
-
-	// Indicates if it's a Delaunay Edge
-	bool bIsDelaunayEdge;
-
-	// Enhanced Methods
-	void CalculateEdgeProperties();
-	void CheckDelaunayCondition();
-};

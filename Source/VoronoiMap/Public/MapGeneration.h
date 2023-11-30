@@ -11,33 +11,12 @@
 
 // Forward declarations
 class UMapNode;
+class UMapEdge;
 
 namespace delaunator
 {
 	class Delaunator;
 }
-
-/**
-* Node that Describes Triangles
-*/
-USTRUCT(BlueprintType)
-struct FDelaunay
-{
-	GENERATED_BODY()
-
-	// Indices of vertices forming the triangle
-	TArray<int32> VertexIndices;
-
-	// Indices of adjacent triangles
-	TArray<int32> AdjacentTrianglesIndices;
-
-	// Indicates if each edge is on the convex hull
-	TArray<bool> IsEdgeOnConvexHull;
-
-	// Intersection points with the bounding box (for edges on the convex hull)
-	TArray<FVector> ConvexHullIntersectionPoints;
-};
-
 
 /**
  * UMapGeneration is a class responsible for generating a Voronoi map and Delaunay triangles.
@@ -46,68 +25,105 @@ struct FDelaunay
 UCLASS(Blueprintable)
 class VORONOIMAP_API UMapGeneration : public UObject
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, Category = "Map Generation")
-	/**
-	 * Main entry function for generating the dual graph (Voronoi and Delaunay structures).
-	 */
-	void Generate();
+    //
+    // Constructor & Destructor
+    //
 
+    /// Constructor
+    UMapGeneration(const FObjectInitializer& ObjectInitializer);
 
-private:
-	//
-	// Generation Helpers
-	//
-	void GeneratePoints();
+    /// Destructor
+    virtual ~UMapGeneration() override;
 
-	delaunator::Delaunator GenerateDiagram();
+    //
+    // Map Generation Function
+    //
 
-	void GenerateDelaunayGraph(delaunator::Delaunator);
-
-
-	void GenerateVoronoiGraph(delaunator::Delaunator);
-
-	FVector CalculateCircumcenter(const FDelaunay&);
+    /// Main entry function for generating the dual graph (Voronoi and Delaunay structures)
+    UFUNCTION(BlueprintCallable, Category = "Map Generation")
+    void Generate();
 
 private:
-	// Holds all Voronoi nodes generated
-	TArray<UMapNode*> Nodes;
+    //
+    // Generation Helpers
+    //
 
-	// Holds all Delaunay triangles generated
-	TArray<FDelaunay> Triangles;
+    /// Generates random points for Voronoi sites/Delaunay vertices
+    void GeneratePoints();
 
-	// Holds all points generated
-	TArray<FVector> Points;
+    /// Generates initial Delaunay triangulation
+    delaunator::Delaunator GenerateDiagram();
+
+    /// Generates Delaunay graph from triangulation
+    void GenerateDelaunayGraph(delaunator::Delaunator& delaunator);
+
+    /// Generates Voronoi graph from Delaunay triangulation
+    void GenerateVoronoiGraph(delaunator::Delaunator& delaunator);
+
+    /// Identifies nodes on the boundary of the map
+    void IdentifyBoundaryNodes();
+
+    /// Handles infinite edges in Voronoi graph
+    void HandleInfiniteEdges();
+
+    /// Rebinds edges on the map boundary
+    void RebindBoundaryEdges();
+
+    /// Ensures the graph maintains Voronoi/Delaunay properties
+    void ValidateGraphIntegrity();
+
+    //
+    // Node and Edge Storage
+    //
+
+    /// Array of nodes in the graph
+    TArray<UMapNode*> Nodes;
+
+    /// Array of edges in the graph
+    TArray<UMapEdge*> Edges;
+
+    /// Nodes on the edge of the map
+    TArray<UMapNode*> BoundaryNodes;
+
+    /// Points generated for Voronoi sites/Delaunay vertices
+    TArray<FVector> Points;
 
 public:
-	//
-	// Constructor & Destructor
-	//
-	UMapGeneration(const FObjectInitializer& ObjectInitializer);
+    //
+    // Attributes for Map Dimensions and Resolution
+    //
 
+    /// Map Width
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Map Attributes")
+    int Width = 1000;
 
-	virtual ~UMapGeneration() override;
+    /// Map Height
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Map Attributes")
+    int Height = 1000;
 
-	//
-	// Attributes for map dimensions and resolution
-	//
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Map Attributes")
-	int Width = 1000;
+    /// Map Resolution
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Map Attributes")
+    int Resolution = 500;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Map Attributes")
-	int Height = 1000;
+    //
+    // Getters
+    //
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Map Attributes")
-	int Resolution = 500;
+    /// Gets the map width
+    int GetWidth() const { return Width; };
 
-	//
-	// Getters
-	//
-	int GetWidth() const { return Width; };
-	int GetHeight() const { return Height; };
-	TArray<UMapNode*> GetNodes() { return Nodes; }
-	TArray<FDelaunay> GetTriangles() { return Triangles; }
-	TArray<FVector> GetPoints() { return Points; };
+    /// Gets the map height
+    int GetHeight() const { return Height; };
+
+    /// Gets the nodes in the graph
+    TArray<UMapNode*> GetNodes() const { return Nodes; }
+
+    /// Gets the points generated for Voronoi sites/Delaunay vertices
+    TArray<FVector> GetPoints() const { return Points; };
+
+    /// Gets the nodes on the map's boundary
+    TArray<UMapNode*> GetBoundaryNodes() const { return BoundaryNodes; }
 };

@@ -6,8 +6,7 @@
 /*
  * Constructor
  */
-UMapNode::UMapNode(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer) {
+UMapNode::UMapNode(const FObjectInitializer& ObjectInitializer): Super(ObjectInitializer) {
 }
 
 
