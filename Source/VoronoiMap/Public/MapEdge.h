@@ -4,13 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "MapNode.generated.h"
+#include "MapEdge.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class VORONOIMAP_API UMapNode : public UUserWidget
+class VORONOIMAP_API UMapEdge : public UUserWidget
 {
 	GENERATED_BODY()
 	

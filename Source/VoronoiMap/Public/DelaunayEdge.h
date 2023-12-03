@@ -3,14 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
-#include "MapNode.generated.h"
+#include "MapEdge.h"
+#include "DelaunayEdge.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class VORONOIMAP_API UMapNode : public UUserWidget
+class VORONOIMAP_API UDelaunayEdge : public UMapEdge
 {
 	GENERATED_BODY()
 	
