@@ -15,6 +15,8 @@ public class VoronoiMap : ModuleRules
 
         PublicIncludePaths.AddRange(new string[] { Path.Combine(ModuleDirectory, "../../ThirdParty/Delaunator/include") });
 
+        PrivateIncludePaths.AddRange(new string[] { "Tests" });
+
         // Uncomment if you are using Slate UI
         PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
 

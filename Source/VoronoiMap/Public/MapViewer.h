@@ -19,11 +19,19 @@ UCLASS()
 class VORONOIMAP_API UMapViewer : public UUserWidget
 {
 	GENERATED_BODY()
+public:
+	/// Constructor   
+	explicit UMapViewer(const FObjectInitializer& ObjectInitializer);
 
-private:
+	virtual void NativeConstruct() override;
+
+	TArray<FVector> TransformPolygons(const TArray<FVector>& Points) const;
+	FVector TransformPoint(const FVector& Point) const;
+
+protected:
 	////////////////////
 	// Map Boundaries //
-	////////////////////
+	//////////////////// 
 
 	int32 Width = 1200;
 	int32 Height = 800;
@@ -42,18 +50,6 @@ private:
 
 	bool IsPanning = false;
 	FVector2D MapPosition = FVector2D(0.0f, 0.0f);
-
-public:
-	/// Constructor   
-	explicit UMapViewer(const FObjectInitializer& ObjectInitializer);
-
-	virtual void NativeConstruct() override;
-
-	TArray<FVector> TransformPolygons(const TArray<FVector>& Points) const;
-	FVector TransformPoint(const FVector& Point) const;
-	bool BoundsCheck();
-
-protected:
 
 	///////////////////////////
 	// Drawing Functionality //
@@ -79,20 +75,32 @@ protected:
 	/// Movement On Map
 	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
+	//////////////////////////////
+	// Additional Functionality //
+	//////////////////////////////
 
+	float GetAspectRatio() const
+	{
+		const FVector2D ViewportSize = GetCachedGeometry().GetAbsoluteSize();
+		if (ViewportSize.Y != 0)
+		{
+			return ViewportSize.X / ViewportSize.Y;
+		}
+		return 0.0f;
+	}
+
+public:
 	/////////////////////
 	// Setters/Getters //
 	/////////////////////
 
-	int32 GetHeight() const { return Height; }
-
-	int32 GetWidth() const { return Width; }
+	FVector2D GetMapSize() const { return FVector2D(Width, Height); }
 
 	void SetHeight(const int32 height) { Height = height; }
 
 	void SetWidth(const int32 width) { Width = width; }
 
-public:
+
 	/////////////////////////////////////////////
 	// TESTING LOGIC FOR VISUAL REPRESENTATION //
 	/////////////////////////////////////////////
