@@ -9,35 +9,33 @@ END_DEFINE_SPEC(FMapViewerTests)
 
 class MapViewerTestHelper : public UMapViewer
 {
+private:
+
+
 public:
 	MapViewerTestHelper(const FObjectInitializer& ObjectInitializer) : UMapViewer(ObjectInitializer) {}
-
-	float GetCurrentZoomLevel() const
-	{
-		return CurrentZoomLevel;
-	}
-
-	FVector2D GetMapPosition() const
-	{
-		return MapPosition;
-	}
-
-	void StartPanning()
-	{
-		IsPanning = true;
-	}
-
-	void StopPanning()
-	{
-		IsPanning = false;
-	}
-
 
 	static FPointerEvent MakeFakeScrollMouseEvent(const float WheelDelta)
 	{
 		return FPointerEvent(0, FVector2D(0.0f, 0.0f), FVector2D(0.0f, 0.0f), TSet<FKey>(), FKey(), WheelDelta, FModifierKeysState());
 	}
 
+	FVector2D TestViewportSize;
+
+	void SetTestViewportSize(const FVector2D& NewSize)
+	{
+		TestViewportSize = NewSize;
+	}
+
+	virtual float GetAspectRatio() const override
+	{
+		return TestViewportSize.X / TestViewportSize.Y;
+	}
+
+	FVector2D GetViewportSize() const
+	{
+		return UMapViewer::GetCachedGeometry().GetLocalSize();
+	}
 
 	FReply CallNativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 	{
@@ -52,21 +50,6 @@ public:
 	FReply CallNativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 	{
 		return NativeOnMouseMove(InGeometry, InMouseEvent);
-	}
-
-	void SetViewportSize(const FVector2D& NewSize)
-	{
-		UMapViewer::SetDesiredSizeInViewport(NewSize);
-	}
-
-	FVector2D GetViewportSize() const
-	{
-		return UMapViewer::GetCachedGeometry().GetLocalSize();
-	}
-
-	float GrabAspectRatio() const
-	{
-		return GetAspectRatio();
 	}
 };
 
@@ -85,16 +68,25 @@ void FMapViewerTests::Define()
 
 	Describe("Aspect Ratio Handling", [this]()
 	{
+		// Test Case 0: Getter/Setters
+		It("should correctly set and get the viewport size", [this]()
+		{
+			MapViewerTestHelper* TestViewer = NewObject<MapViewerTestHelper>();
+			FVector2D ExpectedSize = FVector2D(1200.0f, 800.0f);
+			TestViewer->SetTestViewportSize(ExpectedSize);
+			FVector2D ActualSize = TestViewer->TestViewportSize;
+			TestEqual("Viewport size should be set and retrieved correctly", ActualSize, ExpectedSize);
+		});
+
+
 		// Test Case 1: Correct Aspect Ratio Calculation
 		It("should correctly calculate the aspect ratio", [this]()
 		{
 			MapViewerTestHelper* TestViewer = NewObject<MapViewerTestHelper>();
-
-			// Assuming you have methods to set and get the viewport size
-			TestViewer->SetViewportSize(FVector2D(1200.0f, 800.0f)); // Set a known viewport size
+			TestViewer->SetTestViewportSize(FVector2D(1200.0f, 800.0f)); // Set a known viewport size
 
 			constexpr float ExpectedAspectRatio = 1200.0f / 800.0f; // Calculate the expected aspect ratio
-			const float CalculatedAspectRatio = TestViewer->GrabAspectRatio(); // Get the aspect ratio from the viewer
+			const float CalculatedAspectRatio = TestViewer->GetAspectRatio(); // Get the aspect ratio from the viewer
 
 			TestEqual("Aspect ratio should be calculated correctly", CalculatedAspectRatio, ExpectedAspectRatio);
 		});
@@ -104,10 +96,10 @@ void FMapViewerTests::Define()
 		{
 			MapViewerTestHelper* TestViewer = NewObject<MapViewerTestHelper>();
 
-			TestViewer->SetViewportSize(FVector2D(1200.0f, 800.0f)); // Set initial viewport size
+			TestViewer->SetTestViewportSize(FVector2D(1200.0f, 800.0f)); // Set initial viewport size
 			const FVector2D InitialMapSize = TestViewer->GetMapSize(); // Store the initial map size for comparison
 
-			TestViewer->SetViewportSize(FVector2D(1600.0f, 900.0f)); // Change the viewport size
+			TestViewer->SetTestViewportSize(FVector2D(1600.0f, 900.0f)); // Change the viewport size
 			const FVector2D AdjustedMapSize = TestViewer->GetMapSize(); // Get the adjusted map size
 
 			// Assuming that the map should adjust its size while maintaining the aspect ratio
@@ -144,7 +136,7 @@ void FMapViewerTests::Define()
 
 			TestViewer->CallNativeOnMouseWheel(FGeometry(), FakeMouseEvent);
 
-			TestTrue("Zoom level should be within 0.1 and 1.0", TestViewer->GetCurrentZoomLevel() >= 0.1f && TestViewer->GetCurrentZoomLevel() <= 1.0f);
+			TestTrue("Zoom level should be within 0.1 and 1.0", TestViewer->CurrentZoomLevel >= 0.1f && TestViewer->CurrentZoomLevel <= 1.0f);
 		});
 	});
 
@@ -153,21 +145,21 @@ void FMapViewerTests::Define()
 		It("should update the map position correctly on panning", [this]()
 		{
 			MapViewerTestHelper* TestViewer = NewObject<MapViewerTestHelper>();
-			TestViewer->StartPanning();
+			TestViewer->IsPanning = true;
 
 			// Initial position for reference
-			const FVector2D InitialMapPos = TestViewer->GetMapPosition();
+			const FVector2D InitialMapPos = TestViewer->MapPosition;
 
 			const FPointerEvent FakeMouseEvent = MapViewerTestHelper::MakeFakeMoveMouseEvent(FVector2D(100.0f, 100.0f), FVector2D(50.0f, 50.0f), FVector2D(50.0f, 50.0f));
 
 			TestViewer->CallNativeOnMouseMove(FGeometry(), FakeMouseEvent);
 
-			const FVector2D NewMapPos = TestViewer->GetMapPosition();
+			const FVector2D NewMapPos = TestViewer->MapPosition;
 
 			// Verify that the map position has been updated
 			TestNotEqual("MapPosition should have been updated", InitialMapPos, NewMapPos);
 
-			TestViewer->StopPanning();
+			TestViewer->IsPanning = false;
 		});
 
 		It("should respect map boundaries with different viewport sizes", [this]()

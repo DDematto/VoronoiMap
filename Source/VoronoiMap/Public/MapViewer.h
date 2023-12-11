@@ -28,7 +28,6 @@ public:
 	TArray<FVector> TransformPolygons(const TArray<FVector>& Points) const;
 	FVector TransformPoint(const FVector& Point) const;
 
-protected:
 	////////////////////
 	// Map Boundaries //
 	//////////////////// 
@@ -79,17 +78,8 @@ protected:
 	// Additional Functionality //
 	//////////////////////////////
 
-	float GetAspectRatio() const
-	{
-		const FVector2D ViewportSize = GetCachedGeometry().GetAbsoluteSize();
-		if (ViewportSize.Y != 0)
-		{
-			return ViewportSize.X / ViewportSize.Y;
-		}
-		return 0.0f;
-	}
+	virtual float GetAspectRatio() const;
 
-public:
 	/////////////////////
 	// Setters/Getters //
 	/////////////////////
