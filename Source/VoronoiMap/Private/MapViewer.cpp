@@ -12,6 +12,8 @@
  */
 UMapViewer::UMapViewer(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
+	UE_LOG(LogTemp, Warning, TEXT("UMapViewer constructor called"));
+
 	GeneratePoints();
 }
 
@@ -130,17 +132,6 @@ FReply UMapViewer::NativeOnMouseMove(const FGeometry& InGeometry, const FPointer
 
 	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
 }
-
-float UMapViewer::GetAspectRatio() const
-{
-	const FVector2D ViewportSize = GetCachedGeometry().GetAbsoluteSize();
-	if (ViewportSize.Y != 0)
-	{
-		return ViewportSize.X / ViewportSize.Y;
-	}
-	return 0.0f;
-}
-
 
 ///////////////////////////
 // Drawing Functionality //
