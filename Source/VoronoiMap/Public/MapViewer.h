@@ -24,15 +24,12 @@ public:
 
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
+protected:
 	friend class UMapViewerTestHelper; // Testing Class
 
 	// Size of Map (Points are all within this Size)
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapViewer Settings")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MapViewer Status")
 	FVector2D MapSize = FVector2D(500, 500);
-
-	// Set in UI Editor Size of Actual UI
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapViewer Settings")
-	FVector2D WidgetSize = FVector2D(0, 0);
 
 	// Current Position on Map
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MapViewer Status")
@@ -42,27 +39,31 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MapViewer Status")
 	FVector2D ViewportSize = FVector2D(0.0f, 0.0f);
 
-	// Normalized Value Controlling Viewport Size (0 - Zoomed Out Full Map) (1 - Zoomed in)
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MapViewer Status")
-	float ZoomLevel = 0.0f;
-
-	// Are we currently moving the viewport
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MapViewer Status")
-	bool IsPanning = false;
-
-	// Should we Clip Points outside of Viewport?
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapViewer Options")
-	bool BorderClippingEnabled = true;
-
-	// Can we Pan outside of Scaled Map
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapViewer Options")
+	// Can we Pan outside of Map
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapViewer Graphics")
 	bool PanningLimitsEnabled = true;
 
-	// Can we Zoom outside of Scaled Map
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapViewer Options")
-	bool ZoomLimitsEnabled = true;
+	// Show Widget Border?
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapViewer Graphics")
+	bool ShowWidgetBorder = false;
+
+	// Show Map Center?
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapViewer Graphics")
+	bool ShowMapCenter = true;
 
 private:
+	// Set in UI Editor Size of Actual UI
+	FVector2D WidgetSize = FVector2D(0, 0);
+
+	// Normalized Value Controlling Viewport Size (0 - Zoomed Out Full Map) (1 - Zoomed in)
+	float ZoomLevel = 0.0f;
+
+	// Mouse Position in Virtual Space
+	FVector2D MousePositionInVirtualSpace;
+
+	// Are we currently moving the viewport
+	bool bIsPanning = false;
+
 	///////////
 	// Logic //
 	///////////
@@ -71,17 +72,18 @@ private:
 	void RepositionViewportIfNeeded();
 
 	FVector2D TranslateToWidgetSpace(const FVector2D& VirtualPoint) const;
+	FVector2D TranslateToVirtualSpace(const FVector2D& ScreenPoint) const;
 
 	///////////////////////////
 	// Drawing Functionality // 
 	///////////////////////////
 
-	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
+	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements,
+		int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 	void DrawWidgetBorder(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const;
 	void DrawMapBorder(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const;
 	void DrawPoint(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualPoint,
 				   const FLinearColor& Color) const;
-
 
 	////////////
 	// Events //
@@ -122,6 +124,43 @@ public:
 	explicit UMapViewerTestHelper(const FObjectInitializer& ObjectInitializer) : UMapViewer(ObjectInitializer) {};
 	void SetData(const FVector2D& InWidgetSize, const FVector2D& InMapSize);
 
+	///////////////////////
+	// Exposing Variables//
+	///////////////////////
+
+	// Overloaded Setter/Getter for WidgetSize
+	void SetWidgetSize(const FVector2D& NewWidgetSize) { WidgetSize = NewWidgetSize; }
+	const FVector2D& GetWidgetSize() const { return WidgetSize; }
+
+	// Overloaded Setter/Getter for ZoomLevel
+	void SetZoomLevel(const float NewZoomLevel) { ZoomLevel = NewZoomLevel; }
+	float GetZoomLevel() const { return ZoomLevel; }
+
+	// Overloaded Setter/Getter for MousePositionInVirtualSpace
+	void SetMousePositionInVirtualSpace(const FVector2D& NewMousePositionInVirtualSpace) { MousePositionInVirtualSpace = NewMousePositionInVirtualSpace; }
+	const FVector2D& GetMousePositionInVirtualSpace() const { return MousePositionInVirtualSpace; }
+
+	// Overloaded Setter/Getter for bIsPanning
+	void SetIsPanning(const bool NewIsPanning) { bIsPanning = NewIsPanning; }
+	bool GetIsPanning() const { return bIsPanning; }
+
+	// Overloaded Setter/Getter for MapSize
+	void SetMapSize(const FVector2D& NewMapSize) { MapSize = NewMapSize; }
+	const FVector2D& GetMapSize() const { return MapSize; }
+
+	// Overloaded Setter/Getter for ViewportPosition
+	void SetViewportPosition(const FVector2D& NewViewportPosition) { ViewportPosition = NewViewportPosition; }
+	const FVector2D& GetViewportPosition() const { return ViewportPosition; }
+
+	// Overloaded Setter/Getter for ViewportSize
+	void SetViewportSize(const FVector2D& NewViewportSize) { ViewportSize = NewViewportSize; }
+	const FVector2D& GetViewportSize() const { return ViewportSize; }
+
+	// Overloaded Setter/Getter for PanningLimitsEnabled
+	void SetPanningLimitsEnabled(const bool NewPanningLimitsEnabled) { PanningLimitsEnabled = NewPanningLimitsEnabled; }
+	bool GetPanningLimitsEnabled() const { return PanningLimitsEnabled; }
+
+
 	// Exposing logic methods
 	void UpdateViewportSizeExposed()
 	{
@@ -136,9 +175,9 @@ public:
 
 	FReply NativeOnMouseMoveExposed(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 	{
-		IsPanning = true;
+		bIsPanning = true;
 		FReply ReturnData = UMapViewer::NativeOnMouseMove(InGeometry, InMouseEvent);
-		IsPanning = false;
+		bIsPanning = false;
 		return ReturnData;
 	}
 

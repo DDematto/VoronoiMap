@@ -23,13 +23,15 @@ void UMapViewer::NativeConstruct()
 	Super::NativeConstruct();
 
 	SetIsFocusable(true);
+
+	SetClipping(EWidgetClipping::ClipToBoundsWithoutIntersecting);
 }
 
 void UMapViewer::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
-	const FVector2D LastWidgetSize = MyGeometry.GetAbsoluteSize();
+	const FVector2D LastWidgetSize = MyGeometry.GetLocalSize();
 
 	// Check if the size has changed since the last tick
 	if (WidgetSize != LastWidgetSize)
@@ -62,6 +64,8 @@ FReply UMapViewer::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointe
 	// Update the viewport size after changing the zoom level
 	UpdateViewportSize();
 
+	ViewportPosition = MousePositionInVirtualSpace;
+
 	// Reposition the viewport if needed
 	RepositionViewportIfNeeded();
 
@@ -76,8 +80,11 @@ FReply UMapViewer::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointe
  */
 FReply UMapViewer::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	IsPanning = true;
-	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+	{
+		bIsPanning = true;
+	}
+	return FReply::Unhandled();
 }
 
 /**
@@ -88,8 +95,11 @@ FReply UMapViewer::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FP
  */
 FReply UMapViewer::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	IsPanning = false;
-	return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && bIsPanning)
+	{
+		bIsPanning = false;
+	}
+	return FReply::Unhandled();
 }
 
 /**
@@ -100,26 +110,30 @@ FReply UMapViewer::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPoi
  */
 FReply UMapViewer::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (IsPanning)
+	UUserWidget::NativeOnMouseMove(InGeometry, InMouseEvent);
+
+	if (bIsPanning)
 	{
-		// Calculate a zoom-dependent factor
-		const float ZoomFactor = FMath::Lerp(1.0f, (MapSize / ViewportSize).GetMin(), ZoomLevel);
+		// Convert the current mouse position to virtual space
+		const FVector2D CurrentMousePositionInVirtualSpace = TranslateToVirtualSpace(InGeometry.AbsoluteToLocal(InMouseEvent.GetScreenSpacePosition()));
 
-		// Adjust the cursor delta based on the zoom factor
-		const FVector2D VirtualDelta = -InMouseEvent.GetCursorDelta() / ZoomFactor;
+		// Calculate the delta in virtual space
+		const FVector2D DeltaInVirtualSpace = CurrentMousePositionInVirtualSpace - MousePositionInVirtualSpace;
 
-		// Calculate the new viewport position
-		FVector2D NewViewportPosition = ViewportPosition + VirtualDelta;
+		// Update the viewport position by the delta
+		ViewportPosition -= DeltaInVirtualSpace;
 
-		// Calculate the half size of the viewport
-		const FVector2D HalfViewportSize = ViewportSize / 2;
-
-		// Clamp the new viewport position to the map boundaries
-		NewViewportPosition.X = FMath::Clamp(NewViewportPosition.X, HalfViewportSize.X, MapSize.X - HalfViewportSize.X);
-		NewViewportPosition.Y = FMath::Clamp(NewViewportPosition.Y, HalfViewportSize.Y, MapSize.Y - HalfViewportSize.Y);
-
-		// Update the viewport position
-		ViewportPosition = NewViewportPosition;
+		// Clamp the new viewport position to the map boundaries if panning limits are enabled.
+		if (PanningLimitsEnabled)
+		{
+			ViewportPosition.X = FMath::Clamp(ViewportPosition.X, ViewportSize.X / 2, MapSize.X - ViewportSize.X / 2);
+			ViewportPosition.Y = FMath::Clamp(ViewportPosition.Y, ViewportSize.Y / 2, MapSize.Y - ViewportSize.Y / 2);
+		}
+	}
+	else
+	{
+		// Update the initial mouse position
+		MousePositionInVirtualSpace = TranslateToVirtualSpace(InGeometry.AbsoluteToLocal(InMouseEvent.GetScreenSpacePosition()));
 	}
 
 	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
@@ -178,7 +192,7 @@ FVector2D UMapViewer::TranslateToWidgetSpace(const FVector2D& VirtualPoint) cons
 	// Calculate the top-left corner of the viewport in virtual coordinates
 	const FVector2D ViewportTopLeft = ViewportPosition - (ViewportSize / 2);
 
-	// Calculate the relative position of the point from the viewport's top-left corner
+	// Calculate the relative position of the point from the viewports top-left corner
 	const FVector2D RelativePosition = VirtualPoint - ViewportTopLeft;
 
 	// Determine the scale factor based on the current viewport size
@@ -186,6 +200,17 @@ FVector2D UMapViewer::TranslateToWidgetSpace(const FVector2D& VirtualPoint) cons
 
 	// Apply the scale factor to the relative position
 	return RelativePosition * ScaleFactor;
+}
+
+/**
+ * Converts Cursor Position to Position on Map
+ * @param ScreenPoint Point on Screen
+ * @return Virtual Point
+ */
+FVector2D UMapViewer::TranslateToVirtualSpace(const FVector2D& ScreenPoint) const
+{
+	const FVector2D ScaleFactor = ViewportSize / WidgetSize;
+	return (ScreenPoint * ScaleFactor) + (ViewportPosition - (ViewportSize / 2));
 }
 
 ///////////////////////////
@@ -202,17 +227,19 @@ int32 UMapViewer::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedG
 	// Draw the Border (Should move as ViewportPosition Changes)
 	DrawMapBorder(InContext, AllottedGeometry);
 
-	// Center of Viewport 
-	DrawPoint(InContext, AllottedGeometry, ViewportPosition, FLinearColor::Red);
-
 	// Center of Map
-	DrawPoint(InContext, AllottedGeometry, MapSize / 2, FLinearColor::Yellow);
+	if (ShowMapCenter)
+	{
+		DrawPoint(InContext, AllottedGeometry, MapSize / 2, FLinearColor::Yellow);
+	}
 
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 }
 
 void UMapViewer::DrawWidgetBorder(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const
 {
+	if (!ShowWidgetBorder) { return; }
+
 	// Define points for the border rectangle
 	TArray<FVector2D> BorderPoints;
 	BorderPoints.Add(FVector2D(0, 0));
@@ -247,8 +274,8 @@ void UMapViewer::DrawMapBorder(const FPaintContext& InContext, const FGeometry& 
 	BorderPoints.Add(TranslateToWidgetSpace(TopLeftCorner)); // Close the loop
 
 	// Define the border width and color
-	constexpr float BorderWidth = 1.1f;
-	const FLinearColor BorderColor = FLinearColor::Red;
+	constexpr float BorderWidth = 1.5f;
+	const FLinearColor BorderColor = FLinearColor::White;
 
 	// Draw the border
 	FSlateDrawElement::MakeLines(InContext.OutDrawElements, InContext.LayerId, AllottedGeometry.ToPaintGeometry(), BorderPoints,
