@@ -34,21 +34,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapViewer Settings")
 	FVector2D WidgetSize = FVector2D(0, 0);
 
-	// Scale to Make MapSize = WidgetSize
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MapViewer Status")
-	FVector2D ScalingFactor = FVector2D(1, 1);
-
-	// Center of Our Viewport (Can be Controlled by Zoom & Panning)
+	// Current Position on Map
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MapViewer Status")
 	FVector2D ViewportPosition = FVector2D(250.0f, 250.0f);
 
-	// Size of our Viewport Window (Max size should be MapSize * ScalingFactor)
+	// How large of an area we are viewing on the map
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MapViewer Status")
-	FVector2D ViewportSize = FVector2D(100, 100);
+	FVector2D ViewportSize = FVector2D(0.0f, 0.0f);
 
 	// Normalized Value Controlling Viewport Size (0 - Zoomed Out Full Map) (1 - Zoomed in)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MapViewer Status")
-	float CurrentZoomLevel = 0.0f;
+	float ZoomLevel = 0.0f;
 
 	// Are we currently moving the viewport
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MapViewer Status")
@@ -71,11 +67,10 @@ private:
 	// Logic //
 	///////////
 
-	FVector2D CalculateScalingFactor();
+	void UpdateViewportSize();
+	void RepositionViewportIfNeeded();
 
-	void RecalculateViewportPosition(const FVector2D& MovementDelta);
-
-	void RecalculateViewportPositionAfterZoom();
+	FVector2D TranslateToWidgetSpace(const FVector2D& VirtualPoint) const;
 
 	///////////////////////////
 	// Drawing Functionality // 
@@ -84,8 +79,9 @@ private:
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 	void DrawWidgetBorder(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const;
 	void DrawMapBorder(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const;
-	void DrawViewportWindow(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const;
-	static void DrawPoint(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& Point, const FLinearColor& Color);
+	void DrawPoint(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualPoint,
+				   const FLinearColor& Color) const;
+
 
 	////////////
 	// Events //
@@ -104,8 +100,6 @@ private:
 	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
 public:
-	bool IsPointWithinViewport(const FVector2D& Point) const;
-
 	/////////////////////
 	// Setters/Getters //
 	/////////////////////
@@ -124,93 +118,14 @@ class UMapViewerTestHelper : public UMapViewer
 	GENERATED_BODY()
 
 public:
-	/// Constructor   
+	/// Constructor Sets Up Widget and Map Size
 	explicit UMapViewerTestHelper(const FObjectInitializer& ObjectInitializer) : UMapViewer(ObjectInitializer) {};
-
-	void FakeConstruct(const FVector2D& InWidgetSize, const FVector2D& InMapSize);
-
-	/// Map Size
-	FVector2D GetMapSize() const
-	{
-		return MapSize;
-	}
-
-	void SetMapSize(const FVector2D& Size)
-	{
-		UMapViewer::SetMapSize(Size);
-	}
-
-	// Widget Size
-	FVector2D GetWidgetSize() const
-	{
-		return WidgetSize;
-	}
-
-	void SetWidgetSize(const FVector2D& Size)
-	{
-		WidgetSize = Size;
-	}
-
-	// Map Panning
-	bool GetIsPanning() const
-	{
-		return IsPanning;
-	}
-
-	void SetIsPanning(const bool Value)
-	{
-		IsPanning = Value;
-	}
-
-	// Zoom Level
-	float GetCurrentZoomLevel() const
-	{
-		return CurrentZoomLevel;
-	}
-
-	void SetCurrentZoomLevel(const float Value)
-	{
-		CurrentZoomLevel = Value;
-	}
-
-	// Viewport Position
-	FVector2D GetViewportPosition() const
-	{
-		return ViewportPosition;
-	}
-
-	void SetViewportPosition(const FVector2D& Position)
-	{
-		ViewportPosition = Position;
-	}
-
-	// Viewport Size
-	FVector2D GetViewportSize() const
-	{
-		return ViewportSize;
-	}
-
-	void SetViewportWidth(const FVector2D Size)
-	{
-		ViewportSize = Size;
-	}
+	void SetData(const FVector2D& InWidgetSize, const FVector2D& InMapSize);
 
 	// Exposing logic methods
-
-	FVector2D CalculateScalingFactorExposed()
+	void UpdateViewportSizeExposed()
 	{
-		return CalculateScalingFactor();
-	}
-
-	bool IsPointWithinViewportExposed(const FVector2D& Point) const
-	{
-		return IsPointWithinViewport(Point);
-
-	}
-
-	void RecalculateViewportPositionExposed(const FVector2D& MovementDelta)
-	{
-		RecalculateViewportPosition(MovementDelta);
+		UpdateViewportSize();
 	}
 
 	// Exposing Event Methods
@@ -221,7 +136,10 @@ public:
 
 	FReply NativeOnMouseMoveExposed(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 	{
-		return UMapViewer::NativeOnMouseMove(InGeometry, InMouseEvent);
+		IsPanning = true;
+		FReply ReturnData = UMapViewer::NativeOnMouseMove(InGeometry, InMouseEvent);
+		IsPanning = false;
+		return ReturnData;
 	}
 
 	// TESTING METHODS 

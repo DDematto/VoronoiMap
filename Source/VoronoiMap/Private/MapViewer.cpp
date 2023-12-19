@@ -1,15 +1,19 @@
-// @author Devin DeMatto \n I am just trying out some silly stuff :P
+/**
+ * Functionality For MapViewer and Test Class
+ * @author Devin DeMatto
+ * @file MapViewer.cpp
+ */
 
 #include "MapViewer.h"
 
-/////////////////
-// Constructor //
-/////////////////
+ /////////////////
+ // Constructor //
+ /////////////////
 
-/**
- * Default Constructor, Sets up Control for Key bind Manipulation
- * @param ObjectInitializer
- */
+ /**
+  * Default Constructor, Sets up Control for Key bind Manipulation
+  * @param ObjectInitializer
+  */
 UMapViewer::UMapViewer(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 }
@@ -31,12 +35,14 @@ void UMapViewer::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime
 	if (WidgetSize != LastWidgetSize)
 	{
 		WidgetSize = LastWidgetSize;
-		ScalingFactor = CalculateScalingFactor();
-		ViewportSize = MapSize * ScalingFactor;
-		ViewportPosition = ViewportSize / 2.0;
+
+		// Calculate the center of the scaled map
+		ViewportPosition = MapSize / 2;
+
+		// Calculate ViewportSize on Startup
+		UpdateViewportSize();
 	}
 }
-
 
 //////////////////////
 //  EVENTS/HANDLERS //
@@ -50,32 +56,17 @@ void UMapViewer::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime
  */
 FReply UMapViewer::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	// Existing zoom level adjustment logic
-	const float ZoomChange = InMouseEvent.GetWheelDelta() * 0.10f;
-	CurrentZoomLevel += ZoomChange;
-	CurrentZoomLevel = FMath::Clamp(CurrentZoomLevel, 0.0f, 1.0f);
+	constexpr float ZoomDelta = 0.1f;
+	ZoomLevel = FMath::Clamp(ZoomLevel + (InMouseEvent.GetWheelDelta() * ZoomDelta), 0.0f, 1.0f);
 
-	// Calculate the new viewport size based on zoom level
-	const FVector2D FullyZoomedOutSize = MapSize * ScalingFactor;
-	const FVector2D MaxZoomSize = FVector2D(50.0f, 50.0f);
-	const FVector2D OldViewportSize = ViewportSize;
-	ViewportSize = FMath::Lerp(FullyZoomedOutSize, MaxZoomSize, CurrentZoomLevel);
+	// Update the viewport size after changing the zoom level
+	UpdateViewportSize();
 
-	// Get the cursor position relative to the widget
-	const FVector2D CursorPosition = InMouseEvent.GetScreenSpacePosition() - InGeometry.AbsolutePosition;
-
-	// Calculate the zoom focal point on the map
-	const FVector2D ZoomFocalPoint = ViewportPosition + (CursorPosition - OldViewportSize / 2.0f);
-
-	// Adjust the viewport position based on the zoom focal point
-	ViewportPosition = ZoomFocalPoint - (ViewportSize / 2.0f);
-
-	// Ensure the viewport is still within bounds
-	//RecalculateViewportPositionAfterZoom();
+	// Reposition the viewport if needed
+	RepositionViewportIfNeeded();
 
 	return FReply::Handled();
 }
-
 
 /**
  * Sets up Panning Functionality
@@ -109,9 +100,26 @@ FReply UMapViewer::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPoi
  */
 FReply UMapViewer::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (IsPanning) {
-		const FVector2D MouseDelta = InMouseEvent.GetCursorDelta();
-		RecalculateViewportPosition(MouseDelta);
+	if (IsPanning)
+	{
+		// Calculate a zoom-dependent factor
+		const float ZoomFactor = FMath::Lerp(1.0f, (MapSize / ViewportSize).GetMin(), ZoomLevel);
+
+		// Adjust the cursor delta based on the zoom factor
+		const FVector2D VirtualDelta = -InMouseEvent.GetCursorDelta() / ZoomFactor;
+
+		// Calculate the new viewport position
+		FVector2D NewViewportPosition = ViewportPosition + VirtualDelta;
+
+		// Calculate the half size of the viewport
+		const FVector2D HalfViewportSize = ViewportSize / 2;
+
+		// Clamp the new viewport position to the map boundaries
+		NewViewportPosition.X = FMath::Clamp(NewViewportPosition.X, HalfViewportSize.X, MapSize.X - HalfViewportSize.X);
+		NewViewportPosition.Y = FMath::Clamp(NewViewportPosition.Y, HalfViewportSize.Y, MapSize.Y - HalfViewportSize.Y);
+
+		// Update the viewport position
+		ViewportPosition = NewViewportPosition;
 	}
 
 	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
@@ -121,58 +129,64 @@ FReply UMapViewer::NativeOnMouseMove(const FGeometry& InGeometry, const FPointer
 // Logic //
 ///////////
 
-FVector2D UMapViewer::CalculateScalingFactor()
+/**
+ * Updates Viewport Size Based on Zoom Level
+ */
+void UMapViewer::UpdateViewportSize()
 {
-	// Calculate scaling factors for both width and height
-	const float ScaleFactorWidth = WidgetSize.X / MapSize.X;
-	const float ScaleFactorHeight = WidgetSize.Y / MapSize.Y;
+	// Define the minimum size of the viewport when fully zoomed in
+	const FVector2D MinViewportSize = FVector2D(50, 50);
 
-	ScalingFactor = FVector2D(ScaleFactorWidth, ScaleFactorHeight);
-
-	// Apply the final scaling factor to both dimensions
-	return ScalingFactor;
+	// Linearly interpolate between the full scaled map size and the minimum viewport size based on the current zoom level
+	ViewportSize = FMath::Lerp(MapSize, MinViewportSize, ZoomLevel);
 }
 
-void UMapViewer::RecalculateViewportPosition(const FVector2D& MovementDelta)
+/**
+ * Calculates New ViewPort Position Based on Current Viewport Size
+ */
+void UMapViewer::RepositionViewportIfNeeded()
 {
-	FVector2D PotentialNewPosition = ViewportPosition + MovementDelta;
+	// Calculate the top-left corner of the viewport
+	FVector2D ViewportTopLeft = ViewportPosition - (ViewportSize / 2);
 
-	if (PanningLimitsEnabled)
+	// Adjust the top-left corner to stay within map boundaries
+	ViewportTopLeft.X = FMath::Max(0.0f, ViewportTopLeft.X);
+	ViewportTopLeft.Y = FMath::Max(0.0f, ViewportTopLeft.Y);
+
+	// Adjust for the bottom-right corner
+	const FVector2D BottomRightCorner = ViewportTopLeft + ViewportSize;
+	if (BottomRightCorner.X > MapSize.X)
 	{
-		const FVector2D HalfViewportSize = ViewportSize / 2.0f;
-		const FVector2D ScaledMapSize = MapSize * ScalingFactor;
-
-		// Clamp the potential new position to the scaled map bounds
-		PotentialNewPosition.X = FMath::Clamp(PotentialNewPosition.X, HalfViewportSize.X, ScaledMapSize.X - HalfViewportSize.X);
-		PotentialNewPosition.Y = FMath::Clamp(PotentialNewPosition.Y, HalfViewportSize.Y, ScaledMapSize.Y - HalfViewportSize.Y);
+		ViewportTopLeft.X -= (BottomRightCorner.X - MapSize.X);
+	}
+	if (BottomRightCorner.Y > MapSize.Y)
+	{
+		ViewportTopLeft.Y -= (BottomRightCorner.Y - MapSize.Y);
 	}
 
-	ViewportPosition = PotentialNewPosition;
+	// Recalculate the viewport position based on the adjusted top-left corner
+	ViewportPosition = ViewportTopLeft + (ViewportSize / 2);
 }
 
-void UMapViewer::RecalculateViewportPositionAfterZoom()
+/**
+ * Converts Virtual Points to Widget Space
+ * @param VirtualPoint The Point being Translated
+ * @return Location in Widget Space
+ */
+FVector2D UMapViewer::TranslateToWidgetSpace(const FVector2D& VirtualPoint) const
 {
-	if (ZoomLimitsEnabled)
-	{
-		const FVector2D HalfViewportSize = ViewportSize / 2.0f;
-		const FVector2D ScaledMapSize = MapSize * ScalingFactor;
+	// Calculate the top-left corner of the viewport in virtual coordinates
+	const FVector2D ViewportTopLeft = ViewportPosition - (ViewportSize / 2);
 
-		// Clamp the viewport position to the scaled map bounds
-		ViewportPosition.X = FMath::Clamp(ViewportPosition.X, HalfViewportSize.X, ScaledMapSize.X - HalfViewportSize.X);
-		ViewportPosition.Y = FMath::Clamp(ViewportPosition.Y, HalfViewportSize.Y, ScaledMapSize.Y - HalfViewportSize.Y);
-	}
+	// Calculate the relative position of the point from the viewport's top-left corner
+	const FVector2D RelativePosition = VirtualPoint - ViewportTopLeft;
+
+	// Determine the scale factor based on the current viewport size
+	const FVector2D ScaleFactor = WidgetSize / ViewportSize;
+
+	// Apply the scale factor to the relative position
+	return RelativePosition * ScaleFactor;
 }
-
-bool UMapViewer::IsPointWithinViewport(const FVector2D& Point) const
-{
-	// Calculate the bounds of the viewport
-	const FVector2D ViewportTopLeft = FVector2D(ViewportPosition.X - ViewportSize.X / 2.0f, ViewportPosition.Y - ViewportSize.Y / 2.0f);
-	const FVector2D ViewportBottomRight = FVector2D(ViewportPosition.X + ViewportSize.X / 2.0f, ViewportPosition.Y + ViewportSize.Y / 2.0f);
-
-	// Check if the point is within the viewport bounds
-	return Point.X >= ViewportTopLeft.X && Point.X <= ViewportBottomRight.X && Point.Y >= ViewportTopLeft.Y && Point.Y <= ViewportBottomRight.Y;
-}
-
 
 ///////////////////////////
 // Drawing Functionality //
@@ -182,12 +196,17 @@ int32 UMapViewer::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedG
 {
 	const auto InContext = FPaintContext(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 
-	// Draw the borders
+	// Draw the Widget Drawing Space
 	DrawWidgetBorder(InContext, AllottedGeometry);
-	DrawMapBorder(InContext, AllottedGeometry);
-	DrawViewportWindow(InContext, AllottedGeometry);
 
+	// Draw the Border (Should move as ViewportPosition Changes)
+	DrawMapBorder(InContext, AllottedGeometry);
+
+	// Center of Viewport 
 	DrawPoint(InContext, AllottedGeometry, ViewportPosition, FLinearColor::Red);
+
+	// Center of Map
+	DrawPoint(InContext, AllottedGeometry, MapSize / 2, FLinearColor::Yellow);
 
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 }
@@ -207,72 +226,53 @@ void UMapViewer::DrawWidgetBorder(const FPaintContext& InContext, const FGeometr
 
 	// Draw the Border
 	FSlateDrawElement::MakeLines(InContext.OutDrawElements, InContext.LayerId, AllottedGeometry.ToPaintGeometry(), BorderPoints,
-		ESlateDrawEffect::None, FLinearColor::Yellow, true, BorderWidth);
+		ESlateDrawEffect::None, FLinearColor::White, true, BorderWidth);
 }
-
 
 void UMapViewer::DrawMapBorder(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const
 {
-	const FVector2D ScaledMap = MapSize * ScalingFactor;
-
-	// Define points for the border rectangle
 	TArray<FVector2D> BorderPoints;
-	BorderPoints.Add(FVector2D(0, 0));
-	BorderPoints.Add(FVector2D(ScaledMap.X, 0));
-	BorderPoints.Add(ScaledMap);
-	BorderPoints.Add(FVector2D(0, ScaledMap.Y));
-	BorderPoints.Add(FVector2D(0, 0));
 
-	// Width of Border
+	// Define the corners of the map in virtual space
+	const FVector2D TopLeftCorner(0, 0);
+	const FVector2D TopRightCorner(MapSize.X, 0);
+	const FVector2D BottomLeftCorner(0, MapSize.Y);
+	const FVector2D BottomRightCorner(MapSize.X, MapSize.Y);
+
+	// Translate the corners to widget space
+	BorderPoints.Add(TranslateToWidgetSpace(TopLeftCorner));
+	BorderPoints.Add(TranslateToWidgetSpace(TopRightCorner));
+	BorderPoints.Add(TranslateToWidgetSpace(BottomRightCorner));
+	BorderPoints.Add(TranslateToWidgetSpace(BottomLeftCorner));
+	BorderPoints.Add(TranslateToWidgetSpace(TopLeftCorner)); // Close the loop
+
+	// Define the border width and color
 	constexpr float BorderWidth = 1.1f;
+	const FLinearColor BorderColor = FLinearColor::Red;
 
-	// Draw the Border
+	// Draw the border
 	FSlateDrawElement::MakeLines(InContext.OutDrawElements, InContext.LayerId, AllottedGeometry.ToPaintGeometry(), BorderPoints,
-		ESlateDrawEffect::None, FLinearColor::Red, true, BorderWidth);
+								 ESlateDrawEffect::None, BorderColor, true, BorderWidth);
 }
 
-void UMapViewer::DrawViewportWindow(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const
+void UMapViewer::DrawPoint(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualPoint, const FLinearColor& Color) const
 {
-	// Calculate the bounds of the viewport
-	const FVector2D ViewportTopLeft = FVector2D(ViewportPosition.X - ViewportSize.X / 2.0f, ViewportPosition.Y - ViewportSize.Y / 2.0f);
-	const FVector2D ViewportBottomRight = FVector2D(ViewportPosition.X + ViewportSize.X / 2.0f, ViewportPosition.Y + ViewportSize.Y / 2.0f);
+	// Translate the virtual point to widget space
+	const FVector2D WidgetSpacePoint = TranslateToWidgetSpace(VirtualPoint);
 
-	// Define points for the border rectangle
-	TArray<FVector2D> BorderPoints;
-	BorderPoints.Add(ViewportTopLeft);                                      // Top Left
-	BorderPoints.Add(FVector2D(ViewportBottomRight.X, ViewportTopLeft.Y));  // Top Right
-	BorderPoints.Add(ViewportBottomRight);                                  // Bottom Right
-	BorderPoints.Add(FVector2D(ViewportTopLeft.X, ViewportBottomRight.Y));  // Bottom Left
-	BorderPoints.Add(ViewportTopLeft);                                      // Back to Top Left to close the rectangle
-
-	// Width of Border
-	constexpr float BorderWidth = 1.1f;
-
-	// Draw the Border
-	FSlateDrawElement::MakeLines(InContext.OutDrawElements, InContext.LayerId, AllottedGeometry.ToPaintGeometry(), BorderPoints,
-		ESlateDrawEffect::None, FLinearColor::Blue, true, BorderWidth);
-}
-
-void UMapViewer::DrawPoint(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& Point, const FLinearColor& Color)
-{
 	// Size of the box (point)
 	const FVector2D BoxSize = FVector2D(5.0f, 5.0f);
 
-	// Create a paint geometry for the box
-	const FPaintGeometry PaintGeometry = AllottedGeometry.ToPaintGeometry(Point, BoxSize);
+	// Create a paint geometry for the box at the widget space position
+	const FPaintGeometry PaintGeometry = AllottedGeometry.ToPaintGeometry(WidgetSpacePoint, BoxSize);
 
 	// Create a brush for the box
 	FSlateBrush BoxBrush;
 	BoxBrush.TintColor = FSlateColor(Color);
 
 	// Draw the box
-	FSlateDrawElement::MakeBox(InContext.OutDrawElements, InContext.LayerId,
-							   PaintGeometry, &BoxBrush,
-							   ESlateDrawEffect::None, Color);
+	FSlateDrawElement::MakeBox(InContext.OutDrawElements, InContext.LayerId, PaintGeometry, &BoxBrush, ESlateDrawEffect::None, Color);
 }
-
-
-
 
 /////////////////////
 // Setters/Getters //
@@ -285,25 +285,18 @@ void UMapViewer::DrawPoint(const FPaintContext& InContext, const FGeometry& Allo
 void UMapViewer::SetMapSize(const FVector2D Size)
 {
 	MapSize = Size;
+	UpdateViewportSize();
 }
 
 //////////////////////////////////////
 //          TESTING Class           //
 //////////////////////////////////////
-
-void UMapViewerTestHelper::FakeConstruct(const FVector2D& InWidgetSize, const FVector2D& InMapSize)
+void UMapViewerTestHelper::SetData(const FVector2D& InWidgetSize, const FVector2D& InMapSize)
 {
 	WidgetSize = InWidgetSize;
 	MapSize = InMapSize;
-
-	// Calculate and log the scaling factor
-	ScalingFactor = CalculateScalingFactorExposed();
-
-	// Set the viewport size based on the scaling factor and map size
-	ViewportSize = MapSize * ScalingFactor;
-
-	// Calculate the center of the scaled map
-	ViewportPosition = FVector2D(MapSize.X * ScalingFactor.X / 2.0f, MapSize.Y * ScalingFactor.Y / 2.0f);
+	ViewportPosition = MapSize / 2;
+	UpdateViewportSize();
 }
 
 FPointerEvent UMapViewerTestHelper::MakeFakeMoveMouseEvent(const FVector2D& CursorPosition, const FVector2D& LastCursorPosition, const FVector2D& CursorDelta)
@@ -323,3 +316,5 @@ FPointerEvent UMapViewerTestHelper::MakeFakeScrollMouseEvent(const float WheelDe
 	FModifierKeysState()
 	);
 }
+
+
