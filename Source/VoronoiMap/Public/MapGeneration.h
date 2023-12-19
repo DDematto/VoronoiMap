@@ -3,19 +3,19 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "MapViewer.h"
+#include "InteractiveMap.h"
 #include "MapGeneration.generated.h"
 
 /**
  *
  */
 UCLASS()
-class VORONOIMAP_API UMapGeneration : public UMapViewer
+class VORONOIMAP_API UMapGeneration : public UInteractiveMap
 {
 	GENERATED_BODY()
 
 public:
 	/// Constructor   
-	UMapGeneration(const FObjectInitializer& ObjectInitializer) : UMapViewer(ObjectInitializer) {};
+	explicit UMapGeneration(const FObjectInitializer& ObjectInitializer) : UInteractiveMap(ObjectInitializer) {};
 
 };

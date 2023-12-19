@@ -1,15 +1,15 @@
 
 #include "Misc/AutomationTest.h"
-#include "MapViewer.h"
+#include "InteractiveMap.h"
 
-BEGIN_DEFINE_SPEC(FMapViewerTests, "MapViewerTests", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
-END_DEFINE_SPEC(FMapViewerTests)
+BEGIN_DEFINE_SPEC(FInteractiveMapTests, "InteractiveMapTests", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::ProductFilter)
+END_DEFINE_SPEC(FInteractiveMapTests)
 
-void FMapViewerTests::Define()
+void FInteractiveMapTests::Define()
 {
 	Describe("General Setup", [this]()
 	{
-		It("should instantiate the UMapViewer class as an object", [this]()
+		It("should instantiate the UInteractiveMap class as an object", [this]()
 		{
 			// Arrange & Act
 			UMapViewerTestHelper* MapViewer = NewObject<UMapViewerTestHelper>();
@@ -93,7 +93,7 @@ void FMapViewerTests::Define()
 
 		It("Should Stop Panning on Border", [this]()
 		{
-			// Initialize the UMapViewer instance
+			// Initialize the UInteractiveMap instance
 			UMapViewerTestHelper* MapViewer = NewObject<UMapViewerTestHelper>();
 			MapViewer->SetData(FVector2D(500, 500), FVector2D(1000, 1000));
 			MapViewer->SetPanningLimitsEnabled(true);

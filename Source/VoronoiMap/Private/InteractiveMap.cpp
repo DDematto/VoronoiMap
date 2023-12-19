@@ -1,24 +1,24 @@
 /**
  * Functionality For MapViewer and Test Class
  * @author Devin DeMatto
- * @file MapViewer.cpp
+ * @file InteractiveMap.cpp
  */
 
-#include "MapViewer.h"
+#include "InteractiveMap.h"
 
  /////////////////
- // Constructor //
- /////////////////
+  // Constructor //
+  /////////////////
 
- /**
-  * Default Constructor, Sets up Control for Key bind Manipulation
-  * @param ObjectInitializer
-  */
-UMapViewer::UMapViewer(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
+  /**
+   * Default Constructor, Sets up Control for Key bind Manipulation
+   * @param ObjectInitializer
+   */
+UInteractiveMap::UInteractiveMap(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 }
 
-void UMapViewer::NativeConstruct()
+void UInteractiveMap::NativeConstruct()
 {
 	Super::NativeConstruct();
 
@@ -27,7 +27,7 @@ void UMapViewer::NativeConstruct()
 	SetClipping(EWidgetClipping::ClipToBoundsWithoutIntersecting);
 }
 
-void UMapViewer::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime)
+void UInteractiveMap::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
@@ -56,7 +56,7 @@ void UMapViewer::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime
  * @param InMouseEvent FPointerEvent
  * @return FReply
  */
-FReply UMapViewer::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+FReply UInteractiveMap::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
 	constexpr float ZoomDelta = 0.1f;
 	ZoomLevel = FMath::Clamp(ZoomLevel + (InMouseEvent.GetWheelDelta() * ZoomDelta), 0.0f, 1.0f);
@@ -78,7 +78,7 @@ FReply UMapViewer::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointe
  * @param InMouseEvent FPointerEvent
  * @return FReply
  */
-FReply UMapViewer::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+FReply UInteractiveMap::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
 	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
 	{
@@ -93,7 +93,7 @@ FReply UMapViewer::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FP
  * @param InMouseEvent FPointerEvent
  * @return FReply
  */
-FReply UMapViewer::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+FReply UInteractiveMap::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
 	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && bIsPanning)
 	{
@@ -108,7 +108,7 @@ FReply UMapViewer::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPoi
  * @param InMouseEvent FPointerEvent
  * @return FReply
  */
-FReply UMapViewer::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+FReply UInteractiveMap::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
 	UUserWidget::NativeOnMouseMove(InGeometry, InMouseEvent);
 
@@ -146,7 +146,7 @@ FReply UMapViewer::NativeOnMouseMove(const FGeometry& InGeometry, const FPointer
 /**
  * Updates Viewport Size Based on Zoom Level
  */
-void UMapViewer::UpdateViewportSize()
+void UInteractiveMap::UpdateViewportSize()
 {
 	// Define the minimum size of the viewport when fully zoomed in
 	const FVector2D MinViewportSize = FVector2D(50, 50);
@@ -158,7 +158,7 @@ void UMapViewer::UpdateViewportSize()
 /**
  * Calculates New ViewPort Position Based on Current Viewport Size
  */
-void UMapViewer::RepositionViewportIfNeeded()
+void UInteractiveMap::RepositionViewportIfNeeded()
 {
 	// Calculate the top-left corner of the viewport
 	FVector2D ViewportTopLeft = ViewportPosition - (ViewportSize / 2);
@@ -187,7 +187,7 @@ void UMapViewer::RepositionViewportIfNeeded()
  * @param VirtualPoint The Point being Translated
  * @return Location in Widget Space
  */
-FVector2D UMapViewer::TranslateToWidgetSpace(const FVector2D& VirtualPoint) const
+FVector2D UInteractiveMap::TranslateToWidgetSpace(const FVector2D& VirtualPoint) const
 {
 	// Calculate the top-left corner of the viewport in virtual coordinates
 	const FVector2D ViewportTopLeft = ViewportPosition - (ViewportSize / 2);
@@ -207,7 +207,7 @@ FVector2D UMapViewer::TranslateToWidgetSpace(const FVector2D& VirtualPoint) cons
  * @param ScreenPoint Point on Screen
  * @return Virtual Point
  */
-FVector2D UMapViewer::TranslateToVirtualSpace(const FVector2D& ScreenPoint) const
+FVector2D UInteractiveMap::TranslateToVirtualSpace(const FVector2D& ScreenPoint) const
 {
 	const FVector2D ScaleFactor = ViewportSize / WidgetSize;
 	return (ScreenPoint * ScaleFactor) + (ViewportPosition - (ViewportSize / 2));
@@ -217,7 +217,7 @@ FVector2D UMapViewer::TranslateToVirtualSpace(const FVector2D& ScreenPoint) cons
 // Drawing Functionality //
 ///////////////////////////
 
-int32 UMapViewer::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
+int32 UInteractiveMap::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
 	const auto InContext = FPaintContext(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 
@@ -236,7 +236,7 @@ int32 UMapViewer::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedG
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 }
 
-void UMapViewer::DrawWidgetBorder(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const
+void UInteractiveMap::DrawWidgetBorder(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const
 {
 	if (!ShowWidgetBorder) { return; }
 
@@ -256,7 +256,7 @@ void UMapViewer::DrawWidgetBorder(const FPaintContext& InContext, const FGeometr
 		ESlateDrawEffect::None, FLinearColor::White, true, BorderWidth);
 }
 
-void UMapViewer::DrawMapBorder(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const
+void UInteractiveMap::DrawMapBorder(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const
 {
 	TArray<FVector2D> BorderPoints;
 
@@ -282,7 +282,7 @@ void UMapViewer::DrawMapBorder(const FPaintContext& InContext, const FGeometry& 
 								 ESlateDrawEffect::None, BorderColor, true, BorderWidth);
 }
 
-void UMapViewer::DrawPoint(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualPoint, const FLinearColor& Color) const
+void UInteractiveMap::DrawPoint(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualPoint, const FLinearColor& Color) const
 {
 	// Translate the virtual point to widget space
 	const FVector2D WidgetSpacePoint = TranslateToWidgetSpace(VirtualPoint);
@@ -309,7 +309,7 @@ void UMapViewer::DrawPoint(const FPaintContext& InContext, const FGeometry& Allo
  * Sets Size of Map and Calculates Aspect Ratio
  * @param Size New Size of Map
  */
-void UMapViewer::SetMapSize(const FVector2D Size)
+void UInteractiveMap::SetMapSize(const FVector2D Size)
 {
 	MapSize = Size;
 	UpdateViewportSize();

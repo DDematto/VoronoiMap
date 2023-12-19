@@ -1,24 +1,24 @@
 /**
 * @author Devin DeMatto
-* @file MapViewer.h
+* @file InteractiveMap.h
 */
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "MapViewer.generated.h"
+#include "InteractiveMap.generated.h"
 
 /**
  * Base Class for Interactive Map
  */
 UCLASS()
-class VORONOIMAP_API UMapViewer : public UUserWidget
+class VORONOIMAP_API UInteractiveMap : public UUserWidget
 {
 	GENERATED_BODY()
 public:
 	/// Constructor   
-	explicit UMapViewer(const FObjectInitializer& ObjectInitializer);
+	explicit UInteractiveMap(const FObjectInitializer& ObjectInitializer);
 
 	virtual void NativeConstruct() override;
 
@@ -115,13 +115,13 @@ public:
 * Stub Class for MapViewer Testing
 */
 UCLASS()
-class UMapViewerTestHelper : public UMapViewer
+class UMapViewerTestHelper : public UInteractiveMap
 {
 	GENERATED_BODY()
 
 public:
 	/// Constructor Sets Up Widget and Map Size
-	explicit UMapViewerTestHelper(const FObjectInitializer& ObjectInitializer) : UMapViewer(ObjectInitializer) {};
+	explicit UMapViewerTestHelper(const FObjectInitializer& ObjectInitializer) : UInteractiveMap(ObjectInitializer) {};
 	void SetData(const FVector2D& InWidgetSize, const FVector2D& InMapSize);
 
 	///////////////////////
@@ -170,13 +170,13 @@ public:
 	// Exposing Event Methods
 	FReply NativeOnMouseWheelExposed(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 	{
-		return UMapViewer::NativeOnMouseWheel(InGeometry, InMouseEvent);
+		return UInteractiveMap::NativeOnMouseWheel(InGeometry, InMouseEvent);
 	}
 
 	FReply NativeOnMouseMoveExposed(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 	{
 		bIsPanning = true;
-		FReply ReturnData = UMapViewer::NativeOnMouseMove(InGeometry, InMouseEvent);
+		FReply ReturnData = UInteractiveMap::NativeOnMouseMove(InGeometry, InMouseEvent);
 		bIsPanning = false;
 		return ReturnData;
 	}
