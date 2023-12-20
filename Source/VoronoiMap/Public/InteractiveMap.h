@@ -24,11 +24,14 @@ public:
 
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
+	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements,
+	int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
+
 protected:
 	friend class UMapViewerTestHelper; // Testing Class
 
 	// Size of Map (Points are all within this Size)
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MapViewer Status")
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "MapViewer Status")
 	FVector2D MapSize = FVector2D(500, 500);
 
 	// Current Position on Map
@@ -78,12 +81,8 @@ private:
 	// Drawing Functionality // 
 	///////////////////////////
 
-	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements,
-		int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 	void DrawWidgetBorder(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const;
 	void DrawMapBorder(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const;
-	void DrawPoint(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualPoint,
-				   const FLinearColor& Color) const;
 
 	////////////
 	// Events //
@@ -107,6 +106,9 @@ public:
 	/////////////////////
 
 	void SetMapSize(FVector2D Size);
+
+	void DrawPoint(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualPoint,
+			   const FLinearColor& Color) const;
 };
 
 
@@ -128,6 +130,9 @@ public:
 	// Exposing Variables//
 	///////////////////////
 
+	// Getter for Map Size
+	const FVector2D& GetMapSize()const { return MapSize; }
+
 	// Overloaded Setter/Getter for WidgetSize
 	void SetWidgetSize(const FVector2D& NewWidgetSize) { WidgetSize = NewWidgetSize; }
 	const FVector2D& GetWidgetSize() const { return WidgetSize; }
@@ -143,10 +148,6 @@ public:
 	// Overloaded Setter/Getter for bIsPanning
 	void SetIsPanning(const bool NewIsPanning) { bIsPanning = NewIsPanning; }
 	bool GetIsPanning() const { return bIsPanning; }
-
-	// Overloaded Setter/Getter for MapSize
-	void SetMapSize(const FVector2D& NewMapSize) { MapSize = NewMapSize; }
-	const FVector2D& GetMapSize() const { return MapSize; }
 
 	// Overloaded Setter/Getter for ViewportPosition
 	void SetViewportPosition(const FVector2D& NewViewportPosition) { ViewportPosition = NewViewportPosition; }
