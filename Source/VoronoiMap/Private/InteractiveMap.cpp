@@ -301,6 +301,34 @@ void UInteractiveMap::DrawPoint(const FPaintContext& InContext, const FGeometry&
 	FSlateDrawElement::MakeBox(InContext.OutDrawElements, InContext.LayerId, PaintGeometry, &BoxBrush, ESlateDrawEffect::None, Color);
 }
 
+void UInteractiveMap::DrawLine(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualStartPoint, const FVector2D& VirtualEndPoint, const FLinearColor& Color) const
+{
+	// Translate the virtual start and end points to widget space
+	const FVector2D WidgetSpaceStartPoint = TranslateToWidgetSpace(VirtualStartPoint);
+	const FVector2D WidgetSpaceEndPoint = TranslateToWidgetSpace(VirtualEndPoint);
+
+	// Create an array of points for the line
+	TArray<FVector2D> LinePoints;
+	LinePoints.Add(WidgetSpaceStartPoint);
+	LinePoints.Add(WidgetSpaceEndPoint);
+
+	// Line thickness
+	constexpr float LineThickness = 0.25f;
+
+	// Draw the line
+	FSlateDrawElement::MakeLines(
+		InContext.OutDrawElements,
+		 InContext.LayerId,
+		AllottedGeometry.ToPaintGeometry(),
+		LinePoints,
+		ESlateDrawEffect::None,
+		Color,
+		true,
+		LineThickness
+	);
+}
+
+
 /////////////////////
 // Setters/Getters //
 /////////////////////

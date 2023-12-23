@@ -10,9 +10,16 @@
 #include "InteractiveMap.h"
 #include "MapGeneration.generated.h"
 
- /**
-  * Map Generation Class
-  */
+class UNodeEdge;
+class UMapNode;
+
+namespace delaunator {
+	class Delaunator;
+}
+
+/**
+ * Map Generation Class
+ */
 UCLASS()
 class VORONOIMAP_API UMapGeneration : public UInteractiveMap
 {
@@ -27,18 +34,25 @@ public:
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect,
 		FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapGeneration Stats")
+	bool bDrawVoronoiEdges = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapGeneration Stats")
+	bool bDrawDelaunayEdges = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapGeneration Stats")
+	bool bDrawVoronoiCorners = false;
+
 
 private:
 	// Generates Points Around Map
-	void GeneratePoints();
+	TArray<FVector2D> GeneratePoints() const;
 	float DynamicExclusionRadius() const;
 
-	// Holds Positions of Points
-	TArray<FVector2D> DataPoints;
+	// Create Delaunay Graph
+	void GenerateMap();
+	void GenerateGraph(const delaunator::Delaunator&);
 
-protected:
-
-public:
-	// Getters/Setters
-
+	// Stores all Voronoi Nodes
+	TArray<UMapNode*> Nodes;
 };

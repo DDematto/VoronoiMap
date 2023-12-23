@@ -109,6 +109,9 @@ public:
 
 	void DrawPoint(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualPoint,
 			   const FLinearColor& Color) const;
+
+	void DrawLine(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualStartPoint,
+				  const FVector2D& VirtualEndPoint, const FLinearColor& Color) const;
 };
 
 
