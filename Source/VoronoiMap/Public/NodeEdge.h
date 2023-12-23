@@ -34,7 +34,6 @@ public:
 	// Methods //
 	/////////////
 
-
 	// Default constructor
 	explicit UNodeEdge(const FObjectInitializer& ObjectInitializer) : UUserWidget(ObjectInitializer) {}
 

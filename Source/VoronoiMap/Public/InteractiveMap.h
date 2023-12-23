@@ -6,6 +6,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "MapNode.h"
 #include "Blueprint/UserWidget.h"
 #include "InteractiveMap.generated.h"
 
@@ -112,6 +113,10 @@ public:
 
 	void DrawLine(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualStartPoint,
 				  const FVector2D& VirtualEndPoint, const FLinearColor& Color) const;
+
+	void DrawPolygon(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const UMapNode* Node) const;
+
+	FVector2D GetMousePositionInVirtualSpace() const { return MousePositionInVirtualSpace; }
 };
 
 
@@ -146,7 +151,6 @@ public:
 
 	// Overloaded Setter/Getter for MousePositionInVirtualSpace
 	void SetMousePositionInVirtualSpace(const FVector2D& NewMousePositionInVirtualSpace) { MousePositionInVirtualSpace = NewMousePositionInVirtualSpace; }
-	const FVector2D& GetMousePositionInVirtualSpace() const { return MousePositionInVirtualSpace; }
 
 	// Overloaded Setter/Getter for bIsPanning
 	void SetIsPanning(const bool NewIsPanning) { bIsPanning = NewIsPanning; }

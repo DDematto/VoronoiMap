@@ -38,6 +38,9 @@ public:
 	FVector2D PointB;
 	FVector2D PointC;
 
+	// What Color the Polygon will be
+	FLinearColor Color = FLinearColor::Green;
+
 	/////////////
 	// Methods //
 	/////////////
@@ -49,6 +52,12 @@ public:
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect,
 							  FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle,
 							  bool bParentEnabled) const override;
+
+	/// Checks if Node is Being Hovered Over
+	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	bool IsPointInsideVoronoiNode(const FVector2D& Point) const;
+	void SetNodeColor(const FLinearColor& Color);
+
 
 	// Method to initialize the node
 	void Initialize(const FVector2D& InCircumcenter, const FVector2D& InPointA, const FVector2D& InPointB, const FVector2D& InPointC, UMapGeneration* InMapGenerator);

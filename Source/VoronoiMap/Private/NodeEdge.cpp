@@ -13,7 +13,7 @@ int32 UNodeEdge::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGe
 
 	if (MapGenerator)
 	{
-		MapGenerator->DrawLine(InContext, AllottedGeometry, PointA, PointB, FLinearColor::Red);
+		MapGenerator->DrawLine(InContext, AllottedGeometry, PointA, PointB, FLinearColor::White);
 	}
 
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
