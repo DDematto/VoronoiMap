@@ -9,11 +9,9 @@ public class VoronoiMap : ModuleRules
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "AutomationTest" });
+        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "AutomationTest", "Delaunator" });
 
         PrivateDependencyModuleNames.AddRange(new string[] { });
-
-        PublicIncludePaths.AddRange(new string[] { Path.Combine(ModuleDirectory, "../../ThirdParty/Delaunator/include") });
 
         PrivateIncludePaths.AddRange(new string[] { "Tests" });
 

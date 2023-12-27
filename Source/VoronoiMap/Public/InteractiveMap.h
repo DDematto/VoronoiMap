@@ -13,7 +13,7 @@
 /**
  * Base Class for Interactive Map
  */
-UCLASS()
+UCLASS(Blueprintable)
 class VORONOIMAP_API UInteractiveMap : public UUserWidget
 {
 	GENERATED_BODY()
@@ -27,6 +27,9 @@ public:
 
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements,
 	int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
+
+	/// Panning Map
+	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
 protected:
 	friend class UMapViewerTestHelper; // Testing Class
@@ -55,15 +58,16 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapViewer Graphics")
 	bool ShowMapCenter = true;
 
+	// Mouse Position in Virtual Space
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MapViewer Status")
+	FVector2D MousePositionInVirtualSpace;
+
 private:
 	// Set in UI Editor Size of Actual UI
 	FVector2D WidgetSize = FVector2D(0, 0);
 
 	// Normalized Value Controlling Viewport Size (0 - Zoomed Out Full Map) (1 - Zoomed in)
 	float ZoomLevel = 0.0f;
-
-	// Mouse Position in Virtual Space
-	FVector2D MousePositionInVirtualSpace;
 
 	// Are we currently moving the viewport
 	bool bIsPanning = false;
@@ -98,8 +102,6 @@ private:
 	/// Stop Panning
 	virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
-	/// Panning Map
-	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
 public:
 	/////////////////////
@@ -112,9 +114,11 @@ public:
 			   const FLinearColor& Color) const;
 
 	void DrawLine(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualStartPoint,
-				  const FVector2D& VirtualEndPoint, const FLinearColor& Color) const;
+				  const FVector2D& VirtualEndPoint, const FLinearColor& Color, double Thickness) const;
 
-	void DrawPolygon(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const UMapNode* Node) const;
+	void DrawPolygon(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const TArray<FVector2D>& Vertices, const TArray<
+					 SlateIndex>
+					 & Indices, const FColor& Color) const;
 
 	FVector2D GetMousePositionInVirtualSpace() const { return MousePositionInVirtualSpace; }
 };

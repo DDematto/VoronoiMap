@@ -1,3 +1,5 @@
+// Taken from https://github.com/delfrrr/delaunator-cpp and used under the MIT License
+
 #pragma once
 
 #include <algorithm>
@@ -8,6 +10,7 @@
 #include <memory>
 #include <utility>
 #include <vector>
+#include <tuple>
 
 namespace delaunator {
 
@@ -582,4 +585,4 @@ void Delaunator::link(const std::size_t a, const std::size_t b) {
     }
 }
 
-} //namespace delaunator
+}

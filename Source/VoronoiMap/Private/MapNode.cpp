@@ -8,26 +8,147 @@
 #include "NodeEdge.h"
 
  /**
-  *
-  * @param InCircumcenter Circumcenter Calculated
-  * @param InPointA Point A (Delaunay)
-  * @param InPointB Point B (Delaunay)
-  * @param InPointC Point C (Delaunay)
-  * @param InMapGenerator Map Reference
+  * Setups Node with Critical Information
+  * @param InMapGenerator Map Generator
+  * @param Point Centroid Of Node
   */
-void UMapNode::Initialize(const FVector2D& InCircumcenter, const FVector2D& InPointA, const FVector2D& InPointB, const FVector2D& InPointC, UMapGeneration* InMapGenerator)
+void UMapNode::SetupNode(UMapGeneration* InMapGenerator, const FVector2D Point)
 {
-	Circumcenter = InCircumcenter;
-	PointA = InPointA;
-	PointB = InPointB;
-	PointC = InPointC;
+	Centroid = Point;
 	MapGenerator = InMapGenerator;
+}
 
-	// Generate a random color
-	const float Red = FMath::RandRange(0.0f, 1.0f);
-	const float Green = FMath::RandRange(0.0f, 1.0f);
-	const float Blue = FMath::RandRange(0.0f, 1.0f);
-	Color = FLinearColor(Red, Green, Blue, 1.0f);
+/**
+ * Adds Nearby Node as Neighbor
+ * @param Neighbor Voronoi Node
+ */
+void UMapNode::AddNeighbor(UMapNode* Neighbor) {
+	Neighbors.Add(Neighbor);
+	Neighbor->Neighbors.Add(this);
+}
+
+/**
+ * Adds Edge to Node and Adds Node Reference to Edge
+ * @param Edge Related Edge
+ */
+void UMapNode::AddEdge(UNodeEdge* Edge) {
+	Edge->Nodes.Add(this);
+	Edges.Add(Edge);
+}
+
+/**
+ * Creates Vertices and Index Array For Region Checking and Mesh Generation
+ */
+void UMapNode::BuildMesh()
+{
+	// Clear previous data
+	Vertices.Empty();
+	Indices.Empty();
+
+	if (Edges.IsEmpty())
+	{
+		return;
+	}
+
+	// Start with the first edge
+	UNodeEdge* CurrentEdge = Edges[0];
+	const FVector2D StartPoint = CurrentEdge->PointA;
+	FVector2D EndPoint = CurrentEdge->PointB;
+
+	// Keep track of the edges we've already used
+	TSet<UNodeEdge*> UsedEdges;
+	UsedEdges.Add(CurrentEdge);
+
+	// Add the start point of the first edge
+	Vertices.Add(StartPoint);
+
+	bool bIsClosed = false;
+	bool bDisconnected = false; // Flag for disconnected polygon
+
+	while (!bIsClosed)
+	{
+		Vertices.Add(EndPoint);
+
+		UNodeEdge* NextEdge = nullptr;
+
+		// Find the next edge
+		for (UNodeEdge* Edge : Edges)
+		{
+			if (UsedEdges.Contains(Edge))
+			{
+				continue;
+			}
+
+			if (Edge->PointA == EndPoint)
+			{
+				NextEdge = Edge;
+				EndPoint = Edge->PointB;
+				break;
+			}
+			if (Edge->PointB == EndPoint)
+			{
+				NextEdge = Edge;
+				EndPoint = Edge->PointA;
+				break;
+			}
+		}
+
+		if (NextEdge)
+		{
+			UsedEdges.Add(NextEdge);
+			CurrentEdge = NextEdge;
+		}
+		else
+		{
+			// No connecting edge found, polygon is disconnected
+			bDisconnected = true;
+			break;
+		}
+
+		// Check if we have looped back to the start
+		if (EndPoint == StartPoint)
+		{
+			bIsClosed = true;
+		}
+	}
+
+	if (bDisconnected)
+	{
+		// Set CentroidColor to Red
+		CentroidColor = FLinearColor::Red;
+	}
+	else
+	{
+		// Create indices for triangulation
+		// Assuming a convex polygon
+		for (int32 i = 1; i < Vertices.Num() - 1; i++)
+		{
+			Indices.Add(0);
+			Indices.Add(i);
+			Indices.Add(i + 1);
+		}
+	}
+}
+
+bool UMapNode::IsInNode(const FVector2D& Point)
+{
+	const int32 NumVertices = Vertices.Num();
+	if (NumVertices < 3)
+	{
+		return false;
+	}
+
+	bool bIsInside = false;
+	for (int32 i = 0, j = NumVertices - 1; i < NumVertices; j = i++)
+	{
+		if (((Vertices[i].Y > Point.Y) != (Vertices[j].Y > Point.Y)) &&
+			(Point.X < (Vertices[j].X - Vertices[i].X) * (Point.Y - Vertices[i].Y) / (Vertices[j].Y - Vertices[i].Y) + Vertices[i].X))
+		{
+			bIsInside = !bIsInside;
+		}
+	}
+
+	return bIsInside;
 }
 
 /////////////////////
@@ -36,41 +157,36 @@ void UMapNode::Initialize(const FVector2D& InCircumcenter, const FVector2D& InPo
 
 int32 UMapNode::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
-	const auto MyContext = FPaintContext(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
-
 	if (MapGenerator)
 	{
-		// Draw The Voronoi Polygon
 		LayerId += 1;
-		MapGenerator->DrawPolygon(MyContext, AllottedGeometry, this);
+		const auto Context = FPaintContext(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
+		MapGenerator->DrawPolygon(Context, AllottedGeometry, Vertices, Indices, PolygonColor);
 
-		// Draw Delaunay Edges
-		if (MapGenerator->bDrawDelaunayEdges)
+		if (MapGenerator->bDrawVoronoiEdges)
 		{
 			LayerId += 1;
-			const auto UpdatedContext = FPaintContext(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
-
-			// Draw the Delaunay edges
-			MapGenerator->DrawLine(UpdatedContext, AllottedGeometry, PointA, PointB, FLinearColor::White);
-			MapGenerator->DrawLine(UpdatedContext, AllottedGeometry, PointB, PointC, FLinearColor::White);
-			MapGenerator->DrawLine(UpdatedContext, AllottedGeometry, PointC, PointA, FLinearColor::White);
-		}
-
-		// Draw Voronoi Edges
-		if (MapGenerator->bDrawVoronoiEdges) {
 			for (const UNodeEdge* Edge : Edges)
 			{
-				LayerId += 1;
 				Edge->NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 			}
 		}
 
-		// Draw the Voronoi Edge Corners
-		if (MapGenerator->bDrawVoronoiCorners)
+		if (MapGenerator->bDrawVoronoiCentroids)
 		{
 			LayerId += 1;
 			const auto UpdatedContext = FPaintContext(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
-			MapGenerator->DrawPoint(UpdatedContext, AllottedGeometry, Circumcenter, FLinearColor::Blue);
+			MapGenerator->DrawPoint(UpdatedContext, AllottedGeometry, Centroid, CentroidColor);
+		}
+
+		if (MapGenerator->bDrawDelaunayTriangles && IsSelected)
+		{
+			LayerId += 1;
+			const auto UpdatedContext = FPaintContext(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
+			for (const UMapNode* Neighbor : Neighbors)
+			{
+				MapGenerator->DrawLine(UpdatedContext, AllottedGeometry, Centroid, Neighbor->Centroid, FLinearColor::Black, 1.0);
+			}
 		}
 	}
 
@@ -79,84 +195,7 @@ int32 UMapNode::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeo
 
 FReply UMapNode::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	const FVector2D MousePosition = MapGenerator->GetMousePositionInVirtualSpace();
-
-	// Check if MousePosition is within this Voronoi Node
-	if (IsPointInsideVoronoiNode(MousePosition))
-	{
-		// Update rendering of this node to Green
-		SetNodeColor(FLinearColor::Green);
-
-		// Update neighboring nodes to Red
-		for (UMapNode* Neighbor : Neighbors)
-		{
-			Neighbor->SetNodeColor(FLinearColor::Red);
-		}
-	}
-	else
-	{
-		// Reset Color
-		SetNodeColor(FLinearColor::White);
-
-		// Reset neighbors' color
-		for (UMapNode* Neighbor : Neighbors)
-		{
-			Neighbor->SetNodeColor(FLinearColor::White);
-		}
-	}
+	IsSelected = IsInNode(MapGenerator->GetMousePositionInVirtualSpace());
 
 	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
-}
-
-bool UMapNode::IsPointInsideVoronoiNode(const FVector2D& Point) const
-{
-	for (const UNodeEdge* Edge : Edges)
-	{
-		// Assuming each edge has two points: PointA and PointB
-		const FVector2D A = Edge->PointA;
-		const FVector2D B = Edge->PointB;
-
-		// Compute the cross product of the vector from A to B and the vector from A to the Point
-		const float CrossProduct = (B.X - A.X) * (Point.Y - A.Y) - (B.Y - A.Y) * (Point.X - A.X);
-
-		// If the cross product is negative, the point is on the right side of the edge (outside for a convex polygon)
-		if (CrossProduct < 0)
-		{
-			return false;
-		}
-	}
-
-	// The point is on the left side of all edges, so it's inside the polygon
-	return true;
-}
-
-//////////////////////
-// Dual Graph Logic //
-//////////////////////
-
-/**
- * Adds Nearby Node as Neighbor
- * @param Neighbor Voronoi Node
- */
-void UMapNode::AddNeighbor(UMapNode* Neighbor) {
-	Neighbors.push_back(Neighbor);
-}
-
-
-/**
- * Adds Edge to Node and Adds Node Reference to Edge
- * @param Edge Related Edge
- */
-void UMapNode::AddEdge(UNodeEdge* Edge) {
-	Edge->Nodes.push_back(this);
-	Edges.push_back(Edge);
-}
-
-///////////////////////
-// Setters & Getters //
-///////////////////////
-
-void UMapNode::SetNodeColor(const FLinearColor& UpdatedColor)
-{
-	Color = UpdatedColor;
 }

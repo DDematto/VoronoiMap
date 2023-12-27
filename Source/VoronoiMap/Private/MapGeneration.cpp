@@ -3,9 +3,9 @@
  * @file MapGeneration.cpp
  */
 
-#include <algorithm>
-#include "delaunator.hpp"
 #include "MapGeneration.h"
+#include "DelaunayHelper.h"
+#include <algorithm>
 #include "FPoissonSampling.h"
 #include "MapNode.h"
 #include "NodeEdge.h"
@@ -15,7 +15,13 @@
 void UMapGeneration::NativeConstruct()
 {
 	Super::NativeConstruct();
+
 	GenerateMap();
+
+	for (const auto& Node : Nodes)
+	{
+		Node->BuildMesh();
+	}
 }
 
 int32 UMapGeneration::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
@@ -28,6 +34,15 @@ int32 UMapGeneration::NativePaint(const FPaintArgs& Args, const FGeometry& Allot
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 }
 
+FReply UMapGeneration::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	for (UMapNode* Node : Nodes)
+	{
+		Node->NativeOnMouseMove(InGeometry, InMouseEvent);
+	}
+
+	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+}
 
 /**
  * Creates a Poisson Distribution of Points Based on MapSize
@@ -49,7 +64,7 @@ TArray<FVector2D> UMapGeneration::GeneratePoints() const
 
 /**
  * Creates a Minimum Radius around each point
- * @return A value for a Exclusion Radius around each point
+ * @return A value for a Exclusion Ra#include <algorithm>
  */
 float UMapGeneration::DynamicExclusionRadius() const
 {
@@ -69,101 +84,136 @@ void UMapGeneration::GenerateMap()
 
 	TArray<FVector2D> Points = GeneratePoints();
 
-	std::vector<double> StdCoordinates;
-
+	// Add boundary points
 	// Spacing for boundary points
 	constexpr int Spacing = 50;
 
-	// Add boundary points
 	// Top and bottom edges
 	for (int x = 0; x <= MapSize.X; x += Spacing) {
-		StdCoordinates.push_back(x);
-		StdCoordinates.push_back(0); // Top edge
-		StdCoordinates.push_back(x);
-		StdCoordinates.push_back(MapSize.Y); // Bottom edge
+		Points.Add(FVector2D(x, 0)); // Top edge
+		Points.Add(FVector2D(x, MapSize.Y)); // Bottom edge
 	}
 
 	// Left and right edges
 	for (int y = Spacing; y < MapSize.Y; y += Spacing) {
-		StdCoordinates.push_back(0);
-		StdCoordinates.push_back(y); // Left edge
-		StdCoordinates.push_back(MapSize.X);
-		StdCoordinates.push_back(y); // Right edge
+		Points.Add(FVector2D(0, y)); // Left edge
+		Points.Add(FVector2D(MapSize.X, y)); // Right edge
 	}
 
-	// Reserve space for generated points
-	StdCoordinates.reserve(StdCoordinates.size() + Points.Num() * 2);
-
-	// Add generated points
-	for (const FVector2D& Point : Points) {
-		StdCoordinates.push_back(Point.X);
-		StdCoordinates.push_back(Point.Y);
-	}
-
-	// Perform Delaunay triangulation
-	const delaunator::Delaunator d(StdCoordinates);
+	// Generate Delaunay triangulation
+	const FDelaunayMesh DelaunayMesh = UDelaunayHelper::CreateDelaunayTriangulation(Points);
 
 	// Dual Graph Generation
-	GenerateGraph(d);
+	GenerateGraph(DelaunayMesh, Points);
 }
 
-/**
- * Generates Graphs and Instances Nodes/Edges
- * @param Delaunator Diagram from Delaunator
- */
-void UMapGeneration::GenerateGraph(const delaunator::Delaunator& Delaunator)
+
+void UMapGeneration::GenerateGraph(const FDelaunayMesh& Delaunator, const TArray<FVector2D>& Points)
 {
-	// Map to store triangle index to UMapNode
-	TMap<int32, UMapNode*> TriangleToNodeMap;
+	// Clear any existing nodes to prepare for generating a new graph.
+	Nodes.Empty();
 
-	// Step 1: Create UMapNodes for each triangle's circumcenter
-	for (size_t i = 0; i < Delaunator.triangles.size(); i += 3)
+	// Map to keep track of unique edges using triangle index pairs as keys.
+	TMap<TPair<FTriangleIndex, FTriangleIndex>, UNodeEdge*> UniqueEdgesMap;
+
+	// A mapping from point indices to their corresponding Voronoi nodes (UMapNode instances).
+	TMap<FPointIndex, UMapNode*> PointIndexToNodeMap;
+
+	// Step 1: Create Voronoi nodes for each point in the original set.
+	for (int32 i = 0; i < Points.Num(); ++i)
 	{
-		// Indices of the triangle's vertices
-		const int32 I1 = Delaunator.triangles[i];
-		const int32 I2 = Delaunator.triangles[i + 1];
-		const int32 I3 = Delaunator.triangles[i + 2];
+		FPointIndex PointIndex(i);
+		FVector2D Point = Points[i];
 
-		// Coordinates of the vertices
-		const FVector2D A(Delaunator.coords[2 * I1], Delaunator.coords[2 * I1 + 1]);
-		const FVector2D B(Delaunator.coords[2 * I2], Delaunator.coords[2 * I2 + 1]);
-		const FVector2D C(Delaunator.coords[2 * I3], Delaunator.coords[2 * I3 + 1]);
-
-		// Calculate circumcenter
-		const FVector2D Circumcenter = UE::Geometry::VectorUtil::Circumcenter(A, B, C);
-
-		// Create and initialize UMapNode
 		UMapNode* Node = NewObject<UMapNode>(this, UMapNode::StaticClass());
-		Node->Initialize(Circumcenter, A, B, C, this);
-
-		// Store node
+		Node->SetupNode(this, Point);
 		Nodes.Add(Node);
-		TriangleToNodeMap.Add(i / 3, Node);
+		PointIndexToNodeMap.Add(PointIndex, Node);
 	}
 
-	// Step 2: Establish neighbors and edges
-	for (size_t i = 0; i < Delaunator.halfedges.size(); ++i)
+	// Step 2: Establish edges and associate them with the Voronoi nodes.
+	for (FSideIndex SideIndex = 0; SideIndex.Value < Delaunator.HalfEdges.Num(); ++SideIndex)
 	{
-		const int32 Opposite = Delaunator.halfedges[i];
-		if (Opposite >= 0) // Skip outer edges
+		if (!SideIndex.IsValid())
+			continue;
+
+		FSideIndex OppositeEdgeIndex = UDelaunayHelper::OppositeHalfEdge(Delaunator, SideIndex);
+		if (!OppositeEdgeIndex.IsValid())
+			continue;
+
+		// Get the triangles on either side of this edge
+		FTriangleIndex CurrentTriangleIndex = UDelaunayHelper::GetTriangleIndexFromHalfEdge(SideIndex);
+		FTriangleIndex AdjacentTriangleIndex = UDelaunayHelper::GetTriangleIndexFromHalfEdge(OppositeEdgeIndex);
+
+		// Use the sorted pair of triangle indices to check for unique edges
+		TPair<FTriangleIndex, FTriangleIndex> SortedTrianglePair(
+			FMath::Min(CurrentTriangleIndex, AdjacentTriangleIndex),
+			FMath::Max(CurrentTriangleIndex, AdjacentTriangleIndex)
+		);
+
+		UNodeEdge* Edge = nullptr;
+
+		// Check if this edge has already been created
+		if (UniqueEdgesMap.Contains(SortedTrianglePair))
 		{
-			UMapNode* Node1 = TriangleToNodeMap[i / 3];
-			UMapNode* Node2 = TriangleToNodeMap[Opposite / 3];
+			Edge = UniqueEdgesMap[SortedTrianglePair];
+		}
+		else
+		{
+			// Create the edge and add it to the map
+			FVector2D CircumcenterCurrent = UDelaunayHelper::GetTriangleCircumcenter(
+				UDelaunayHelper::ConvertTriangleIDToTriangle(Delaunator, CurrentTriangleIndex)
+			);
+			FVector2D CircumcenterAdjacent = UDelaunayHelper::GetTriangleCircumcenter(
+				UDelaunayHelper::ConvertTriangleIDToTriangle(Delaunator, AdjacentTriangleIndex)
+			);
 
-			// Check if nodes are already neighbors
-			if (std::ranges::find(Node1->Neighbors, Node2) == Node1->Neighbors.end())
+			Edge = NewObject<UNodeEdge>(this, UNodeEdge::StaticClass());
+			Edge->SetupEdge(CircumcenterCurrent, CircumcenterAdjacent, this);
+
+			UniqueEdgesMap.Add(SortedTrianglePair, Edge);
+		}
+
+		// Check if the current and adjacent triangles share a common vertex with the node's original point
+		TArray<FPointIndex> CurrentTrianglePoints = UDelaunayHelper::PointsOfTriangle(Delaunator, CurrentTriangleIndex);
+		TArray<FPointIndex> AdjacentTrianglePoints = UDelaunayHelper::PointsOfTriangle(Delaunator, AdjacentTriangleIndex);
+
+		for (FPointIndex PointIndex : CurrentTrianglePoints)
+		{
+			if (AdjacentTrianglePoints.Contains(PointIndex)) // This check ensures both triangles share this vertex
 			{
-				Node1->AddNeighbor(Node2);
+				UMapNode* Node = PointIndexToNodeMap[PointIndex];
+				if (Node && !Node->Edges.Contains(Edge))
+				{
+					Node->AddEdge(Edge);
 
-				// Create an edge between Node1 and Node2
-				UNodeEdge* Edge = NewObject<UNodeEdge>(this, UNodeEdge::StaticClass());
-				Edge->Initialize(Node1->Circumcenter, Node2->Circumcenter, this);
+					// Add each node as a neighbor to each other if not already neighbors
+					for (FPointIndex OtherPointIndex : CurrentTrianglePoints)
+					{
+						if (OtherPointIndex != PointIndex)
+						{
+							UMapNode* OtherNode = PointIndexToNodeMap[OtherPointIndex];
+							if (OtherNode && !Node->Neighbors.Contains(OtherNode))
+							{
+								Node->AddNeighbor(OtherNode);
+							}
+						}
+					}
 
-				// Add edge to nodes
-				Node1->AddEdge(Edge);
-				Node2->AddEdge(Edge);
+					for (FPointIndex OtherPointIndex : AdjacentTrianglePoints)
+					{
+						if (OtherPointIndex != PointIndex)
+						{
+							UMapNode* OtherNode = PointIndexToNodeMap[OtherPointIndex];
+							if (OtherNode && !Node->Neighbors.Contains(OtherNode))
+							{
+								Node->AddNeighbor(OtherNode);
+							}
+						}
+					}
+				}
 			}
 		}
+
 	}
 }
-

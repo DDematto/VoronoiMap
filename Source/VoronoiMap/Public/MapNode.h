@@ -7,6 +7,8 @@
 
 #include "Blueprint/UserWidget.h"
 #include "CoreMinimal.h"
+#include "DelaunayHelper.h"
+#include "NodeEdge.h"
 #include "MapNode.generated.h"
 
 class UMapGeneration;
@@ -21,51 +23,52 @@ class VORONOIMAP_API UMapNode : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	// Reference to Map
+	// Reference to Map Generator
 	UMapGeneration* MapGenerator = nullptr;
 
-	// All Neighbor Nodes
-	std::vector<UMapNode*> Neighbors;
+	// Centroid of Node (Original Point)
+	FVector2D Centroid;
 
-	// All Edges Making up Node
-	std::vector<UNodeEdge*> Edges;
+	// Neighboring Nodes
+	UPROPERTY()
+	TArray<UMapNode*> Neighbors;
 
-	// Circumcenter of Voronoi Node On Map
-	FVector2D Circumcenter;
+	// Edges Making up Nodes
+	UPROPERTY()
+	TArray<UNodeEdge*> Edges;
 
-	// Delaunay Points
-	FVector2D PointA;
-	FVector2D PointB;
-	FVector2D PointC;
+	// Vertices for Mesh Generation
+	TArray<FVector2D> Vertices;
 
-	// What Color the Polygon will be
-	FLinearColor Color = FLinearColor::Green;
+	// Indices for Mesh Generation
+	TArray<SlateIndex> Indices;
 
-	/////////////
-	// Methods //
-	/////////////
+	// Color of 2D Polygon
+	FColor PolygonColor = FColor::MakeRandomColor();
+
+	// Color of Centroid
+	FLinearColor CentroidColor = FLinearColor::Green;
+
+	// Is Node Currently Selected 
+	bool IsSelected = false;
 
 	// Default constructor
 	explicit UMapNode(const FObjectInitializer& ObjectInitializer) : UUserWidget(ObjectInitializer) {}
 
-	// Paint Method
+	// Logic for Building Structure
+	void SetupNode(UMapGeneration*, FVector2D);
+	void AddNeighbor(UMapNode*);
+	void AddEdge(UNodeEdge*);
+
+	// Building Polygon Mesh
+	void BuildMesh();
+	bool IsInNode(const FVector2D& Point);
+
+	// Events //
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect,
 							  FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle,
 							  bool bParentEnabled) const override;
 
-	/// Checks if Node is Being Hovered Over
 	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
-	bool IsPointInsideVoronoiNode(const FVector2D& Point) const;
-	void SetNodeColor(const FLinearColor& Color);
-
-
-	// Method to initialize the node
-	void Initialize(const FVector2D& InCircumcenter, const FVector2D& InPointA, const FVector2D& InPointB, const FVector2D& InPointC, UMapGeneration* InMapGenerator);
-
-	// Methods to add neighbors
-	void AddNeighbor(UMapNode* Neighbor);
-
-	// Add Edge & Reference to This Node
-	void AddEdge(UNodeEdge* Edge);
 };
 

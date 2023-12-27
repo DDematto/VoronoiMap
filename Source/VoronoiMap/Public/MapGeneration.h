@@ -12,10 +12,7 @@
 
 class UNodeEdge;
 class UMapNode;
-
-namespace delaunator {
-	class Delaunator;
-}
+struct FDelaunayMesh;
 
 /**
  * Map Generation Class
@@ -26,33 +23,39 @@ class VORONOIMAP_API UMapGeneration : public UInteractiveMap
 	GENERATED_BODY()
 
 public:
-	/// Constructor   
-	explicit UMapGeneration(const FObjectInitializer& ObjectInitializer) : UInteractiveMap(ObjectInitializer) {};
-
-	virtual void NativeConstruct() override;
-
-	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect,
-		FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapGeneration Stats")
 	bool bDrawVoronoiEdges = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapGeneration Stats")
-	bool bDrawDelaunayEdges = true;
+	bool bDrawDelaunayTriangles = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapGeneration Stats")
-	bool bDrawVoronoiCorners = false;
+	bool bDrawVoronoiCentroids = true;
 
+	// Constructor   
+	explicit UMapGeneration(const FObjectInitializer& ObjectInitializer) : UInteractiveMap(ObjectInitializer) {};
+
+	virtual void NativeConstruct() override;
+
+	// Events //
+
+	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect,
+		FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
+
+	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
 private:
-	// Generates Points Around Map
+	// Stores all Voronoi Nodes
+	UPROPERTY()
+	TArray<UMapNode*> Nodes;
+
+	// Generates Poisson Distribution
 	TArray<FVector2D> GeneratePoints() const;
 	float DynamicExclusionRadius() const;
 
 	// Create Delaunay Graph
 	void GenerateMap();
-	void GenerateGraph(const delaunator::Delaunator&);
 
-	// Stores all Voronoi Nodes
-	TArray<UMapNode*> Nodes;
+	// Creates Relationship from Delaunay Graphs to Nodes & Edges
+	void GenerateGraph(const FDelaunayMesh&, const TArray<FVector2D>& Points);
 };

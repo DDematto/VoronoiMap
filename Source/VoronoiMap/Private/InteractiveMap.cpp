@@ -6,9 +6,6 @@
 
 #include "InteractiveMap.h"
 
-#include "MapNode.h"
-#include "NodeEdge.h"
-
  /////////////////
    // Constructor //
    /////////////////
@@ -291,10 +288,11 @@ void UInteractiveMap::DrawPoint(const FPaintContext& InContext, const FGeometry&
 	const FVector2D WidgetSpacePoint = TranslateToWidgetSpace(VirtualPoint);
 
 	// Size of the box (point)
-	const FVector2D BoxSize = FVector2D(5.0f, 5.0f);
+	const FVector2D BoxSize = FVector2D(10.0f, 10.0f);
 
 	// Create a paint geometry for the box at the widget space position
-	const FPaintGeometry PaintGeometry = AllottedGeometry.ToPaintGeometry(WidgetSpacePoint, BoxSize);
+	// Updated to use the newer API as suggested by the warning
+	const FPaintGeometry PaintGeometry = AllottedGeometry.ToPaintGeometry(BoxSize, FSlateLayoutTransform(WidgetSpacePoint));
 
 	// Create a brush for the box
 	FSlateBrush BoxBrush;
@@ -304,7 +302,7 @@ void UInteractiveMap::DrawPoint(const FPaintContext& InContext, const FGeometry&
 	FSlateDrawElement::MakeBox(InContext.OutDrawElements, InContext.LayerId, PaintGeometry, &BoxBrush, ESlateDrawEffect::None, Color);
 }
 
-void UInteractiveMap::DrawLine(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualStartPoint, const FVector2D& VirtualEndPoint, const FLinearColor& Color) const
+void UInteractiveMap::DrawLine(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualStartPoint, const FVector2D& VirtualEndPoint, const FLinearColor& Color, double Thickness) const
 {
 	// Translate the virtual start and end points to widget space
 	const FVector2D WidgetSpaceStartPoint = TranslateToWidgetSpace(VirtualStartPoint);
@@ -315,9 +313,6 @@ void UInteractiveMap::DrawLine(const FPaintContext& InContext, const FGeometry& 
 	LinePoints.Add(WidgetSpaceStartPoint);
 	LinePoints.Add(WidgetSpaceEndPoint);
 
-	// Line thickness
-	constexpr float LineThickness = 0.5f;
-
 	// Draw the line
 	FSlateDrawElement::MakeLines(
 		InContext.OutDrawElements,
@@ -327,52 +322,34 @@ void UInteractiveMap::DrawLine(const FPaintContext& InContext, const FGeometry& 
 		ESlateDrawEffect::None,
 		Color,
 		true,
-		LineThickness
+		Thickness
 	);
 }
 
-void UInteractiveMap::DrawPolygon(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const UMapNode* Node) const
+void UInteractiveMap::DrawPolygon(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const TArray<FVector2D>& Vertices, const TArray<SlateIndex>& Indices, const FColor& Color) const
 {
-	if (Node == nullptr || Node->Edges.capacity() < 3)
-	{
-		return; // Ensure the node and edges are valid and sufficient to form a triangle
-	}
-
-	TArray<FSlateVertex> Vertices;
-	TArray<SlateIndex> Indices;
-
-	// Extract three points from the node's edges
-	const FVector2D V0 = Node->Edges[0]->PointA; // First vertex
-	const FVector2D V1 = Node->Edges[1]->PointA; // Second vertex
-	const FVector2D V2 = Node->Edges[2]->PointA; // Third vertex
-
-	// Convert points to widget space and then to FVector2f
-	const FVector2f WidgetSpaceV0 = FVector2f(TranslateToWidgetSpace(V0));
-	const FVector2f WidgetSpaceV1 = FVector2f(TranslateToWidgetSpace(V1));
-	const FVector2f WidgetSpaceV2 = FVector2f(TranslateToWidgetSpace(V2));
-
-	// Define color
-	const FColor VertexColor = Node->Color.ToFColor(true); // Assuming Node->Color is FLinearColor
+	// Array for FSlateVertex
+	TArray<FSlateVertex> SlateVertices;
 
 	// Default texture coordinates
-	const FVector2f DefaultTextCoordinate(0.0f, 0.0f);
+	FVector2f DefaultTexCoord(0.0f, 0.0f);
 
-	// Use the Make function to create vertices
-	Vertices.Add(FSlateVertex::Make(AllottedGeometry.GetAccumulatedRenderTransform(), WidgetSpaceV0, DefaultTextCoordinate, VertexColor, VertexColor));
-	Vertices.Add(FSlateVertex::Make(AllottedGeometry.GetAccumulatedRenderTransform(), WidgetSpaceV1, DefaultTextCoordinate, VertexColor, VertexColor));
-	Vertices.Add(FSlateVertex::Make(AllottedGeometry.GetAccumulatedRenderTransform(), WidgetSpaceV2, DefaultTextCoordinate, VertexColor, VertexColor));
+	// Convert each vertex to FSlateVertex
+	for (const FVector2D& Vertex : Vertices)
+	{
+		// Convert to widget space using TranslateToWidgetSpace
+		const FVector2f WidgetSpaceVertex = FVector2f(TranslateToWidgetSpace(Vertex));
 
-	// Add indices to define the triangle
-	Indices.Add(0);
-	Indices.Add(1);
-	Indices.Add(2);
+		// Make FSlateVertex and add to the array
+		SlateVertices.Add(FSlateVertex::Make(AllottedGeometry.GetAccumulatedRenderTransform(), WidgetSpaceVertex, DefaultTexCoord, Color));
+	}
 
-	// Create the custom verts element using Node's color
+	// Draw the polygon using the vertices and indices
 	FSlateDrawElement::MakeCustomVerts(
 		InContext.OutDrawElements,
 		InContext.LayerId,
-		FSlateResourceHandle(),
-		Vertices,
+		FSlateResourceHandle(), // Default handle
+		SlateVertices,
 		Indices,
 		nullptr, // No additional instance data
 		0, // Instance offset
