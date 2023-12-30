@@ -64,6 +64,7 @@ FReply UInteractiveMap::NativeOnMouseWheel(const FGeometry& InGeometry, const FP
 	// Update the viewport size after changing the zoom level
 	UpdateViewportSize();
 
+	// Adjust the viewport position by the zoom offset
 	ViewportPosition = MousePositionInVirtualSpace;
 
 	// Reposition the viewport if needed
@@ -80,7 +81,7 @@ FReply UInteractiveMap::NativeOnMouseWheel(const FGeometry& InGeometry, const FP
  */
 FReply UInteractiveMap::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton)
+	if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
 	{
 		bIsPanning = true;
 	}
@@ -95,7 +96,7 @@ FReply UInteractiveMap::NativeOnMouseButtonDown(const FGeometry& InGeometry, con
  */
 FReply UInteractiveMap::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && bIsPanning)
+	if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton && bIsPanning)
 	{
 		bIsPanning = false;
 	}
@@ -148,11 +149,15 @@ FReply UInteractiveMap::NativeOnMouseMove(const FGeometry& InGeometry, const FPo
  */
 void UInteractiveMap::UpdateViewportSize()
 {
-	// Define the minimum size of the viewport when fully zoomed in
-	const FVector2D MinViewportSize = FVector2D(50, 50);
-
-	// Linearly interpolate between the full scaled map size and the minimum viewport size based on the current zoom level
-	ViewportSize = FMath::Lerp(MapSize, MinViewportSize, ZoomLevel);
+	if (ZoomLimitsEnabled) {
+		// Linearly interpolate between the full scaled map size and the minimum viewport size based on the current zoom level
+		ViewportSize = FMath::Lerp(MapSize, MinViewportSize, ZoomLevel);
+	}
+	else
+	{
+		// Linearly interpolate between the full scaled map size and the minimum viewport size based on the current zoom level
+		ViewportSize = FMath::Lerp(MapSize * 2, MinViewportSize, ZoomLevel);
+	}
 }
 
 /**
@@ -160,22 +165,21 @@ void UInteractiveMap::UpdateViewportSize()
  */
 void UInteractiveMap::RepositionViewportIfNeeded()
 {
-	// Calculate the top-left corner of the viewport
+	// Calculate the top-left & bottom-right corner of the viewport
 	FVector2D ViewportTopLeft = ViewportPosition - (ViewportSize / 2);
+	const FVector2D ViewportBottomRight = ViewportTopLeft + ViewportSize;
 
 	// Adjust the top-left corner to stay within map boundaries
 	ViewportTopLeft.X = FMath::Max(0.0f, ViewportTopLeft.X);
 	ViewportTopLeft.Y = FMath::Max(0.0f, ViewportTopLeft.Y);
 
-	// Adjust for the bottom-right corner
-	const FVector2D BottomRightCorner = ViewportTopLeft + ViewportSize;
-	if (BottomRightCorner.X > MapSize.X)
+	if (ViewportBottomRight.X > MapSize.X)
 	{
-		ViewportTopLeft.X -= (BottomRightCorner.X - MapSize.X);
+		ViewportTopLeft.X -= (ViewportBottomRight.X - MapSize.X);
 	}
-	if (BottomRightCorner.Y > MapSize.Y)
+	if (ViewportBottomRight.Y > MapSize.Y)
 	{
-		ViewportTopLeft.Y -= (BottomRightCorner.Y - MapSize.Y);
+		ViewportTopLeft.Y -= (ViewportBottomRight.Y - MapSize.Y);
 	}
 
 	// Recalculate the viewport position based on the adjusted top-left corner
@@ -224,16 +228,16 @@ int32 UInteractiveMap::NativePaint(const FPaintArgs& Args, const FGeometry& Allo
 	// Draw the Widget Drawing Space
 	DrawWidgetBorder(InContext, AllottedGeometry);
 
-	// Draw the Border (Should move as ViewportPosition Changes)
+	// Draw the Border Of Map
 	DrawMapBorder(InContext, AllottedGeometry);
 
 	// Center of Map
 	if (ShowMapCenter)
 	{
-		DrawPoint(InContext, AllottedGeometry, MapSize / 2, FLinearColor::Yellow);
+		DrawPoint(InContext, AllottedGeometry, MapSize / 2, FLinearColor::Red, FVector2D(5.0f, 5.0f));
 	}
 
-	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
+	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId + 1, InWidgetStyle, bParentEnabled);
 }
 
 void UInteractiveMap::DrawWidgetBorder(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const
@@ -274,25 +278,25 @@ void UInteractiveMap::DrawMapBorder(const FPaintContext& InContext, const FGeome
 	BorderPoints.Add(TranslateToWidgetSpace(TopLeftCorner)); // Close the loop
 
 	// Define the border width and color
-	constexpr float BorderWidth = 1.5f;
-	const FLinearColor BorderColor = FLinearColor::White;
+	constexpr float BorderWidth = 2.0f;
+	const FLinearColor BorderColor = FLinearColor::Black;
 
 	// Draw the border
 	FSlateDrawElement::MakeLines(InContext.OutDrawElements, InContext.LayerId, AllottedGeometry.ToPaintGeometry(), BorderPoints,
 								 ESlateDrawEffect::None, BorderColor, true, BorderWidth);
 }
 
-void UInteractiveMap::DrawPoint(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualPoint, const FLinearColor& Color) const
+void UInteractiveMap::DrawPoint(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualPoint, const FLinearColor& Color, const FVector2D Size) const
 {
 	// Translate the virtual point to widget space
-	const FVector2D WidgetSpacePoint = TranslateToWidgetSpace(VirtualPoint);
+	FVector2D WidgetSpacePoint = TranslateToWidgetSpace(VirtualPoint);
 
-	// Size of the box (point)
-	const FVector2D BoxSize = FVector2D(10.0f, 10.0f);
+	// Adjust WidgetSpacePoint to center the box on the point
+	WidgetSpacePoint -= Size * 0.5f;
 
 	// Create a paint geometry for the box at the widget space position
 	// Updated to use the newer API as suggested by the warning
-	const FPaintGeometry PaintGeometry = AllottedGeometry.ToPaintGeometry(BoxSize, FSlateLayoutTransform(WidgetSpacePoint));
+	const FPaintGeometry PaintGeometry = AllottedGeometry.ToPaintGeometry(Size, FSlateLayoutTransform(WidgetSpacePoint));
 
 	// Create a brush for the box
 	FSlateBrush BoxBrush;
@@ -302,7 +306,7 @@ void UInteractiveMap::DrawPoint(const FPaintContext& InContext, const FGeometry&
 	FSlateDrawElement::MakeBox(InContext.OutDrawElements, InContext.LayerId, PaintGeometry, &BoxBrush, ESlateDrawEffect::None, Color);
 }
 
-void UInteractiveMap::DrawLine(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualStartPoint, const FVector2D& VirtualEndPoint, const FLinearColor& Color, double Thickness) const
+void UInteractiveMap::DrawLine(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualStartPoint, const FVector2D& VirtualEndPoint, const FLinearColor& Color, const double Thickness) const
 {
 	// Translate the virtual start and end points to widget space
 	const FVector2D WidgetSpaceStartPoint = TranslateToWidgetSpace(VirtualStartPoint);
@@ -319,6 +323,29 @@ void UInteractiveMap::DrawLine(const FPaintContext& InContext, const FGeometry& 
 		 InContext.LayerId,
 		AllottedGeometry.ToPaintGeometry(),
 		LinePoints,
+		ESlateDrawEffect::None,
+		Color,
+		true,
+		Thickness
+	);
+}
+
+void UInteractiveMap::DrawLines(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const TArray<FVector2D>& Points, const FLinearColor& Color, const double Thickness) const
+{
+	// Create an array of points in widget space
+	TArray<FVector2D> WidgetSpacePoints;
+	for (const FVector2D& Point : Points)
+	{
+		FVector2D WidgetSpacePoint = TranslateToWidgetSpace(Point);
+		WidgetSpacePoints.Add(WidgetSpacePoint);
+	}
+
+	// Draw the lines using Slate's drawing system
+	FSlateDrawElement::MakeLines(
+		InContext.OutDrawElements,
+		InContext.LayerId,
+		AllottedGeometry.ToPaintGeometry(),
+		WidgetSpacePoints,
 		ESlateDrawEffect::None,
 		Color,
 		true,

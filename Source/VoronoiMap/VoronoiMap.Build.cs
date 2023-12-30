@@ -9,13 +9,12 @@ public class VoronoiMap : ModuleRules
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "AutomationTest", "Delaunator" });
+        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "AutomationTest", "Delaunator", "GeometryCore" });
 
         PrivateDependencyModuleNames.AddRange(new string[] { });
 
-        PrivateIncludePaths.AddRange(new string[] { "Tests" });
+        // PrivateIncludePaths.AddRange(new string[] { "Tests" });
 
-        // Uncomment if you are using Slate UI
         PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
 
         // Uncomment if you are using online features

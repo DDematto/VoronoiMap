@@ -6,12 +6,18 @@
 #include "MapNode.h"
 #include "MapGeneration.h"
 #include "NodeEdge.h"
+#include "CompGeom/PolygonTriangulation.h"
+#include "Algo/Reverse.h"
+
+ //////////////////////////////////
+ // Logic for Building Structure //
+ //////////////////////////////////
 
  /**
-  * Setups Node with Critical Information
-  * @param InMapGenerator Map Generator
-  * @param Point Centroid Of Node
-  */
+ * Setups Node with Critical Information
+ * @param InMapGenerator Map Generator
+ * @param Point Centroid Of Node
+ */
 void UMapNode::SetupNode(UMapGeneration* InMapGenerator, const FVector2D Point)
 {
 	Centroid = Point;
@@ -36,99 +42,140 @@ void UMapNode::AddEdge(UNodeEdge* Edge) {
 	Edges.Add(Edge);
 }
 
-/**
- * Creates Vertices and Index Array For Region Checking and Mesh Generation
- */
+///////////////////////////
+// Building Polygon Mesh //
+///////////////////////////
+
 void UMapNode::BuildMesh()
 {
-	// Clear previous data
-	Vertices.Empty();
-	Indices.Empty();
+	// Assume Node is Outside Until Proven Otherwise
+	bool bNodeIsOutside = true;
 
-	if (Edges.IsEmpty())
+	// Sort Edges Array
+	SortEdges();
+
+	// Add Vertices
+	FVector2D LastPointAdded;
+	for (int32 i = 0; i < Edges.Num(); ++i)
 	{
-		return;
+		UNodeEdge* CurrentEdge = Edges[i];
+
+		// Check if BezierCurvePoints are empty and calculate if needed
+		if (CurrentEdge->BezierCurvePoints.IsEmpty())
+		{
+			CurrentEdge->CalculateBezier();
+		}
+
+		// Declares Node Inside Map
+		if (bNodeIsOutside && (CurrentEdge->bIsEdgeInsideMap || CurrentEdge->bIsPartiallyInMap))
+		{
+			bNodeIsOutside = false;
+		}
+		else if (CurrentEdge->bIsPartiallyInMap)
+		{
+			PolygonColor = FColor::Blue;
+			IsBorderNode = true;
+		}
+
+		TArray<FVector2D> PointsToAdd;
+
+		// If it's the first edge or the last point matches the first bezier point, add as is
+		if (i == 0 || LastPointAdded.Equals(CurrentEdge->BezierCurvePoints[0]))
+		{
+			PointsToAdd = CurrentEdge->BezierCurvePoints;
+		}
+		else // If the last point doesn't match, reverse the order
+		{
+			PointsToAdd = CurrentEdge->BezierCurvePoints;
+			Algo::Reverse(PointsToAdd);
+		}
+
+		// Update the last point added for comparison in the next iteration
+		LastPointAdded = PointsToAdd.Last();
+
+		// Add points to Vertices set
+		Vertices.Append(PointsToAdd);
 	}
 
-	// Start with the first edge
-	UNodeEdge* CurrentEdge = Edges[0];
-	const FVector2D StartPoint = CurrentEdge->PointA;
-	FVector2D EndPoint = CurrentEdge->PointB;
-
-	// Keep track of the edges we've already used
-	TSet<UNodeEdge*> UsedEdges;
-	UsedEdges.Add(CurrentEdge);
-
-	// Add the start point of the first edge
-	Vertices.Add(StartPoint);
-
-	bool bIsClosed = false;
-	bool bDisconnected = false; // Flag for disconnected polygon
-
-	while (!bIsClosed)
+	// If Node is Outside We Remove it
+	if (bNodeIsOutside)
 	{
-		Vertices.Add(EndPoint);
+		return MapGenerator->MarkNodeForRemoval(this);
+	}
 
-		UNodeEdge* NextEdge = nullptr;
+	// Building Indices
+	TArray<UE::Geometry::FIndex3i> OutTriangles;
+	PolygonTriangulation::TriangulateSimplePolygon(Vertices, OutTriangles);
 
-		// Find the next edge
-		for (UNodeEdge* Edge : Edges)
+	for (const UE::Geometry::FIndex3i& Triangle : OutTriangles)
+	{
+		Indices.Add(Triangle.A);
+		Indices.Add(Triangle.B);
+		Indices.Add(Triangle.C);
+	}
+}
+
+void UMapNode::SortEdges()
+{
+	// Map to store connections
+	TMap<FVector2D, TArray<UNodeEdge*>> EdgeMap;
+	TSet<UNodeEdge*> CheckedEdges; // Set to keep track of checked edges
+
+	// Populate the map and set
+	for (UNodeEdge* Edge : Edges)
+	{
+		EdgeMap.FindOrAdd(Edge->PointA).Add(Edge);
+		EdgeMap.FindOrAdd(Edge->PointB).Add(Edge);
+		CheckedEdges.Add(Edge);
+	}
+
+	TArray<UNodeEdge*> SortedEdges;
+	SortedEdges.Reserve(Edges.Num()); // Preallocate memory
+
+	UNodeEdge* CurrentEdge = Edges[0];
+	SortedEdges.Add(CurrentEdge);
+	CheckedEdges.Remove(CurrentEdge); // Remove from checked set
+
+	FVector2D CurrentEndpoint = CurrentEdge->PointB;
+
+	while (SortedEdges.Num() < Edges.Num())
+	{
+		TArray<UNodeEdge*>* ConnectedEdges = EdgeMap.Find(CurrentEndpoint);
+		if (!ConnectedEdges)
 		{
-			if (UsedEdges.Contains(Edge))
-			{
-				continue;
-			}
-
-			if (Edge->PointA == EndPoint)
-			{
-				NextEdge = Edge;
-				EndPoint = Edge->PointB;
-				break;
-			}
-			if (Edge->PointB == EndPoint)
-			{
-				NextEdge = Edge;
-				EndPoint = Edge->PointA;
-				break;
-			}
-		}
-
-		if (NextEdge)
-		{
-			UsedEdges.Add(NextEdge);
-			CurrentEdge = NextEdge;
-		}
-		else
-		{
-			// No connecting edge found, polygon is disconnected
-			bDisconnected = true;
 			break;
 		}
 
-		// Check if we have looped back to the start
-		if (EndPoint == StartPoint)
+		bool bFoundNextEdge = false;
+
+		for (int32 i = 0; i < ConnectedEdges->Num(); ++i)
 		{
-			bIsClosed = true;
+			UNodeEdge* Edge = (*ConnectedEdges)[i];
+			if (CheckedEdges.Contains(Edge))
+			{
+				if (Edge->PointA == CurrentEndpoint || Edge->PointB == CurrentEndpoint)
+				{
+					SortedEdges.Add(Edge);
+					CurrentEndpoint = (Edge->PointA == CurrentEndpoint) ? Edge->PointB : Edge->PointA;
+					CheckedEdges.Remove(Edge);
+					bFoundNextEdge = true;
+					break;
+				}
+			}
+		}
+
+		if (!bFoundNextEdge)
+		{
+			break;
 		}
 	}
 
-	if (bDisconnected)
-	{
-		// Set CentroidColor to Red
-		CentroidColor = FLinearColor::Red;
-	}
-	else
-	{
-		// Create indices for triangulation
-		// Assuming a convex polygon
-		for (int32 i = 1; i < Vertices.Num() - 1; i++)
-		{
-			Indices.Add(0);
-			Indices.Add(i);
-			Indices.Add(i + 1);
-		}
-	}
+	Edges = MoveTemp(SortedEdges);
 }
+
+////////////////////////////
+// Node Positioning Check //
+////////////////////////////
 
 bool UMapNode::IsInNode(const FVector2D& Point)
 {
@@ -151,41 +198,54 @@ bool UMapNode::IsInNode(const FVector2D& Point)
 	return bIsInside;
 }
 
-/////////////////////
-//  Painting Logic //
-/////////////////////
+//////////////////
+//  Event Logic //
+//////////////////
 
 int32 UMapNode::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
 	if (MapGenerator)
 	{
-		LayerId += 1;
-		const auto Context = FPaintContext(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
+		auto Context = FPaintContext(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 		MapGenerator->DrawPolygon(Context, AllottedGeometry, Vertices, Indices, PolygonColor);
+
+		if (IsSelected && bDrawVerticesTraversal)
+		{
+			constexpr FLinearColor StartColor = FLinearColor(0.0f, 1.0f, 1.0f, 1.0f); // Cyan (mixture of green and blue)
+			constexpr FLinearColor EndColor = FLinearColor(1.0f, 0.0f, 0.0f, 1.0f); // Bright red
+
+			const int VertexCount = Vertices.Num();
+			for (int i = 0; i < VertexCount; ++i)
+			{
+				const float LeperFactor = static_cast<float>(i) / (VertexCount - 1);
+				FLinearColor CalculatedColor = FLinearColor::LerpUsingHSV(StartColor, EndColor, LeperFactor);
+
+				Context.LayerId += 1;
+				MapGenerator->DrawPoint(Context, AllottedGeometry, Vertices[i], CalculatedColor, FVector2D(1, 1) * 10);
+			}
+		}
 
 		if (MapGenerator->bDrawVoronoiEdges)
 		{
-			LayerId += 1;
 			for (const UNodeEdge* Edge : Edges)
 			{
-				Edge->NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
+				const int32 SelectedLayer = IsSelected ? LayerId + 2 : LayerId + 1;
+				Edge->NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, SelectedLayer, InWidgetStyle, bParentEnabled);
 			}
 		}
 
 		if (MapGenerator->bDrawVoronoiCentroids)
 		{
-			LayerId += 1;
-			const auto UpdatedContext = FPaintContext(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
-			MapGenerator->DrawPoint(UpdatedContext, AllottedGeometry, Centroid, CentroidColor);
+			Context.LayerId += 1;
+			MapGenerator->DrawPoint(Context, AllottedGeometry, Centroid, CentroidColor, FVector2D(2.0f, 2.0f));
 		}
 
 		if (MapGenerator->bDrawDelaunayTriangles && IsSelected)
 		{
-			LayerId += 1;
-			const auto UpdatedContext = FPaintContext(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 			for (const UMapNode* Neighbor : Neighbors)
 			{
-				MapGenerator->DrawLine(UpdatedContext, AllottedGeometry, Centroid, Neighbor->Centroid, FLinearColor::Black, 1.0);
+				Context.LayerId += 1;
+				MapGenerator->DrawLine(Context, AllottedGeometry, Centroid, Neighbor->Centroid, FLinearColor::Red, 1.0);
 			}
 		}
 	}
@@ -197,5 +257,67 @@ FReply UMapNode::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEv
 {
 	IsSelected = IsInNode(MapGenerator->GetMousePositionInVirtualSpace());
 
+	if (IsSelected)
+	{
+		for (UNodeEdge* Edge : Edges)
+		{
+			Edge->Color = FLinearColor::White;
+		}
+	}
+	else
+	{
+		for (UNodeEdge* Edge : Edges)
+		{
+			Edge->Color = FLinearColor::Black;
+		}
+	}
+
 	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+}
+
+FReply UMapNode::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && IsSelected)
+	{
+		// Log Centroid
+		//UE_LOG(LogTemp, Warning, TEXT("Node Centroid: (%f, %f)"), Centroid.X, Centroid.Y);
+
+		// Log Neighbors
+		//for (const UMapNode* Neighbor : Neighbors)
+		//{
+		//	const FVector2D NeighborCentroid = Neighbor->Centroid;
+		//	UE_LOG(LogTemp, Warning, TEXT("Neighbor Centroid: (%f, %f)"), NeighborCentroid.X, NeighborCentroid.Y);
+		//}
+
+		// Log Edges
+		// UE_LOG(LogTemp, Warning, TEXT("Edges Total: %d"), Edges.Num());
+		//for (const UNodeEdge* Edge : Edges)
+		//{
+		// UE_LOG(LogTemp, Warning, TEXT("Edge Points: A(%f, %f), B(%f, %f)"), Edge->PointA.X, Edge->PointA.Y, Edge->PointB.X, Edge->PointB.Y);
+		//}
+
+		// Log Vertices for Mesh Generation
+		//for (const FVector2D& Vertex : Vertices)
+		//{
+		//	UE_LOG(LogTemp, Warning, TEXT("Mesh Vertex: (%f, %f)"), Vertex.X, Vertex.Y);
+		//}
+
+		// Log Indices for Mesh Generation
+		//for (const SlateIndex& Index : Indices)
+		//{
+		//	UE_LOG(LogTemp, Warning, TEXT("Mesh Index: %d"), Index);
+		//}
+	}
+
+	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+}
+
+FReply UMapNode::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && IsSelected)
+	{
+
+	}
+
+	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }

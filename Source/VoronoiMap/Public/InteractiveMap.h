@@ -23,10 +23,24 @@ public:
 
 	virtual void NativeConstruct() override;
 
+	////////////
+	// Events //
+	////////////
+
+	// Resize And Initial Load
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements,
 	int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const override;
+
+	/// Zooming in On Map
+	virtual FReply NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+
+	/// Start Panning
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+
+	/// Stop Panning
+	virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
 	/// Panning Map
 	virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
@@ -50,6 +64,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapViewer Graphics")
 	bool PanningLimitsEnabled = true;
 
+	// Can we Zoom outside of Map
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapViewer Graphics")
+	bool ZoomLimitsEnabled = true;
+
 	// Show Widget Border?
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapViewer Graphics")
 	bool ShowWidgetBorder = false;
@@ -61,6 +79,10 @@ protected:
 	// Mouse Position in Virtual Space
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MapViewer Status")
 	FVector2D MousePositionInVirtualSpace;
+
+	// Define the minimum size of the viewport when fully zoomed in
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapViewer Graphics")
+	FVector2D MinViewportSize = FVector2D(20, 20);
 
 private:
 	// Set in UI Editor Size of Actual UI
@@ -89,20 +111,6 @@ private:
 	void DrawWidgetBorder(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const;
 	void DrawMapBorder(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const;
 
-	////////////
-	// Events //
-	////////////
-
-	/// Zooming in On Map
-	virtual FReply NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
-
-	/// Start Panning
-	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
-
-	/// Stop Panning
-	virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
-
-
 public:
 	/////////////////////
 	// Setters/Getters //
@@ -110,11 +118,15 @@ public:
 
 	void SetMapSize(FVector2D Size);
 
+	const FVector2D& GetMapSize()const { return MapSize; }
+
 	void DrawPoint(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualPoint,
-			   const FLinearColor& Color) const;
+				   const FLinearColor& Color, const FVector2D Size) const;
 
 	void DrawLine(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualStartPoint,
-				  const FVector2D& VirtualEndPoint, const FLinearColor& Color, double Thickness) const;
+				  const FVector2D& VirtualEndPoint, const FLinearColor& Color, const double Thickness) const;
+
+	void DrawLines(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const TArray<FVector2D>& Points, const FLinearColor& Color, const double Thickness) const;
 
 	void DrawPolygon(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const TArray<FVector2D>& Vertices, const TArray<
 					 SlateIndex>
@@ -122,8 +134,6 @@ public:
 
 	FVector2D GetMousePositionInVirtualSpace() const { return MousePositionInVirtualSpace; }
 };
-
-
 
 /**
 * Stub Class for MapViewer Testing
@@ -141,9 +151,6 @@ public:
 	///////////////////////
 	// Exposing Variables//
 	///////////////////////
-
-	// Getter for Map Size
-	const FVector2D& GetMapSize()const { return MapSize; }
 
 	// Overloaded Setter/Getter for WidgetSize
 	void SetWidgetSize(const FVector2D& NewWidgetSize) { WidgetSize = NewWidgetSize; }

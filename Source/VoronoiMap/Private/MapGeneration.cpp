@@ -11,27 +11,29 @@
 #include "NodeEdge.h"
 #include "VectorUtil.h"
 
- // Constructor and Events
+ // Constructor
 void UMapGeneration::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	GenerateMap();
+	SetMapSize(FVector2D(500, 500));
 
-	for (const auto& Node : Nodes)
-	{
-		Node->BuildMesh();
-	}
+	GenerateMap();
 }
+
+//////////////////
+//  Event Logic //
+//////////////////
 
 int32 UMapGeneration::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
 	for (const UMapNode* Node : Nodes)
 	{
-		Node->NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
+		Node->NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId - 2, InWidgetStyle, bParentEnabled);
 	}
 
-	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
+	// Decrement the LayerId for UMapGeneration
+	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId - 1, InWidgetStyle, bParentEnabled);
 }
 
 FReply UMapGeneration::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
@@ -44,70 +46,67 @@ FReply UMapGeneration::NativeOnMouseMove(const FGeometry& InGeometry, const FPoi
 	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
 }
 
+FReply UMapGeneration::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	for (UMapNode* Node : Nodes)
+	{
+		Node->NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+	}
+
+	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+}
+
+FReply UMapGeneration::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	for (UMapNode* Node : Nodes)
+	{
+		Node->NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+	}
+
+	return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+}
+
 /**
  * Creates a Poisson Distribution of Points Based on MapSize
  */
 TArray<FVector2D> UMapGeneration::GeneratePoints() const
 {
 	// Define parameters for Poisson Disk Sampling
-	const float ExclusionRadius = DynamicExclusionRadius(); // Define an appropriate exclusion radius
-	constexpr int Iterations = 20; // Set the number of iterations for the sampling
-	constexpr int K = 1; // Amount of Times a Point will attempt to place
+	constexpr int Iterations = 30; // Set the number of iterations for the sampling
+	constexpr int K = 5; // Amount of Times a Point will attempt to place
+	constexpr int Spacing = 50; // Set the Spacing Between Nodes
 
 	// Setup the random stream
 	FRandomStream RandomStream;
 	RandomStream.GenerateNewSeed();
 
-	// Call the Poisson Disk Sampling function
-	return FPoissonSampling::GeneratePoissonDiscSamples(MapSize.X, MapSize.Y, ExclusionRadius, K, Iterations, RandomStream);
+	// Call the Poisson Disk Sampling function with Spacing parameter
+	return FPoissonSampling::GeneratePoissonDiscSamples(MapSize.X + BoundaryOffset.X, MapSize.Y + BoundaryOffset.Y, Spacing, K, Iterations, RandomStream);
 }
 
-/**
- * Creates a Minimum Radius around each point
- * @return A value for a Exclusion Ra#include <algorithm>
- */
-float UMapGeneration::DynamicExclusionRadius() const
-{
-	constexpr float BaseMapSize = 500.0f; // Base map size (both width and height)
-	constexpr float BaseExclusionRadius = 25.0f; // Base exclusion radius for the minimum map size
-
-	const float ScaleFactor = FMath::Sqrt((MapSize.X * MapSize.Y) / (BaseMapSize * BaseMapSize));
-	return BaseExclusionRadius * ScaleFactor;
-}
-
-/**
- * Main Method For Map Generation
- */
+// Main Method For Map Generation
 void UMapGeneration::GenerateMap()
 {
 	Nodes.Empty();
 
-	TArray<FVector2D> Points = GeneratePoints();
-
-	// Add boundary points
-	// Spacing for boundary points
-	constexpr int Spacing = 50;
-
-	// Top and bottom edges
-	for (int x = 0; x <= MapSize.X; x += Spacing) {
-		Points.Add(FVector2D(x, 0)); // Top edge
-		Points.Add(FVector2D(x, MapSize.Y)); // Bottom edge
-	}
-
-	// Left and right edges
-	for (int y = Spacing; y < MapSize.Y; y += Spacing) {
-		Points.Add(FVector2D(0, y)); // Left edge
-		Points.Add(FVector2D(MapSize.X, y)); // Right edge
-	}
+	const TArray<FVector2D> Points = GeneratePoints();
 
 	// Generate Delaunay triangulation
 	const FDelaunayMesh DelaunayMesh = UDelaunayHelper::CreateDelaunayTriangulation(Points);
 
 	// Dual Graph Generation
 	GenerateGraph(DelaunayMesh, Points);
+
+	// Try To Build Mesh, Remove Nodes Out of Bounds, And Clip Nodes in Bounds
+	for (const auto& Node : Nodes)
+	{
+		Node->BuildMesh();
+	}
+
+	ProcessInvalidNodes();
 }
 
-
+// Convert to Data Structures
 void UMapGeneration::GenerateGraph(const FDelaunayMesh& Delaunator, const TArray<FVector2D>& Points)
 {
 	// Clear any existing nodes to prepare for generating a new graph.
@@ -123,7 +122,7 @@ void UMapGeneration::GenerateGraph(const FDelaunayMesh& Delaunator, const TArray
 	for (int32 i = 0; i < Points.Num(); ++i)
 	{
 		FPointIndex PointIndex(i);
-		FVector2D Point = Points[i];
+		FVector2D Point = Points[i] - (BoundaryOffset / 2);
 
 		UMapNode* Node = NewObject<UMapNode>(this, UMapNode::StaticClass());
 		Node->SetupNode(this, Point);
@@ -163,10 +162,11 @@ void UMapGeneration::GenerateGraph(const FDelaunayMesh& Delaunator, const TArray
 			// Create the edge and add it to the map
 			FVector2D CircumcenterCurrent = UDelaunayHelper::GetTriangleCircumcenter(
 				UDelaunayHelper::ConvertTriangleIDToTriangle(Delaunator, CurrentTriangleIndex)
-			);
+			) - (BoundaryOffset / 2);
+
 			FVector2D CircumcenterAdjacent = UDelaunayHelper::GetTriangleCircumcenter(
 				UDelaunayHelper::ConvertTriangleIDToTriangle(Delaunator, AdjacentTriangleIndex)
-			);
+			) - (BoundaryOffset / 2);
 
 			Edge = NewObject<UNodeEdge>(this, UNodeEdge::StaticClass());
 			Edge->SetupEdge(CircumcenterCurrent, CircumcenterAdjacent, this);
@@ -217,3 +217,45 @@ void UMapGeneration::GenerateGraph(const FDelaunayMesh& Delaunator, const TArray
 
 	}
 }
+
+// Removal of Invalid Nodes
+
+void UMapGeneration::MarkNodeForRemoval(UMapNode* Node)
+{
+	if (Node && !InvalidNodes.Contains(Node))
+	{
+		InvalidNodes.Add(Node);
+	}
+}
+
+void UMapGeneration::ProcessInvalidNodes()
+{
+	TArray<UNodeEdge*> EdgesToRemove;
+
+	// Process nodes for removal
+	for (UMapNode* Node : InvalidNodes)
+	{
+		for (UNodeEdge* Edge : Node->Edges)
+		{
+			Edge->Nodes.Remove(Node);
+			if (Edge->Nodes.Num() == 0)
+			{
+				EdgesToRemove.AddUnique(Edge);
+			}
+		}
+
+		for (UMapNode* Neighbor : Node->Neighbors)
+		{
+			Neighbor->Neighbors.Remove(Node);
+		}
+	}
+
+	// Remove edges and nodes
+	for (UMapNode* Node : InvalidNodes)
+	{
+		Nodes.Remove(Node);
+	}
+
+	InvalidNodes.Empty();
+}
+
