@@ -30,7 +30,7 @@ public:
 	FVector2D Centroid;
 
 	// Height of Node
-	float Height = 0;
+	float Height = -1;
 
 	// Neighboring Nodes
 	UPROPERTY()
@@ -46,14 +46,14 @@ public:
 	// Indices for Mesh Generation
 	TArray<SlateIndex> Indices;
 
-	// Color of 2D Polygon
-	FColor Color = FColor::Blue;
-
 	// Color of Centroid
-	FLinearColor CentroidColor = FLinearColor::White;
+	FLinearColor CentroidColor = FLinearColor::Black;
 
-	// Is Node a Border Node
-	bool IsBorderNode = false;
+	// Color of 2D Polygon
+	FColor Color = FColor::Green;
+
+	// Is this Node a Sea Node
+	bool bIsSea = true;
 
 	// Draw Vertices Traversal
 	bool bDrawVerticesTraversal = true;

@@ -14,6 +14,8 @@ class UNodeEdge;
 class UMapNode;
 struct FDelaunayMesh;
 
+class TerrainGenerator;
+
 /**
  * Map Generation Class
  */
@@ -44,6 +46,9 @@ public:
 
 	virtual void NativeConstruct() override;
 
+	// Generator Modules
+	TerrainGenerator* TerrainGen = nullptr;
+
 	//////////////////
 	//  Event Logic //
 	//////////////////
@@ -68,7 +73,14 @@ public:
 
 	void SetSelectedNode(UMapNode* Node);
 
+	TArray<UMapNode*>& GetNodes() { return Nodes; }
+
+	int32 GetMapSeed() const { return MapSeed; }
+
 private:
+	// Map Seed for All Modules
+	int32 MapSeed = FMath::RandRange(0, 1000);
+
 	// Stores all Voronoi Nodes
 	UPROPERTY()
 	TArray<UMapNode*> Nodes;

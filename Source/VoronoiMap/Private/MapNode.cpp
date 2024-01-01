@@ -71,11 +71,6 @@ void UMapNode::BuildMesh()
 		{
 			bNodeIsOutside = false;
 		}
-		else if (CurrentEdge->bIsPartiallyInMap)
-		{
-			Color = FColor::Blue;
-			IsBorderNode = true;
-		}
 
 		TArray<FVector2D> PointsToAdd;
 
@@ -224,7 +219,7 @@ void UMapNode::Selected()
 
 int32 UMapNode::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
-	if (MapGenerator)
+	if (MapGenerator && !bIsSea)
 	{
 		auto Context = FPaintContext(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 		MapGenerator->DrawPolygon(Context, AllottedGeometry, Vertices, Indices, Color);
@@ -275,7 +270,7 @@ int32 UMapNode::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeo
 
 FReply UMapNode::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (IsInNode(MapGenerator->GetMousePositionInVirtualSpace()) && MapGenerator->GetSelectedNode() != this)
+	if (IsInNode(MapGenerator->GetMousePositionInVirtualSpace()) && !bIsSea)
 	{
 		MapGenerator->SetSelectedNode(this);
 	}

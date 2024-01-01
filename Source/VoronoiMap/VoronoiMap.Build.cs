@@ -9,7 +9,8 @@ public class VoronoiMap : ModuleRules
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "AutomationTest", "Delaunator", "GeometryCore" });
+        PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "AutomationTest",
+            "Delaunator", "GeometryCore", "SimplexNoise" });
 
         PrivateDependencyModuleNames.AddRange(new string[] { });
 

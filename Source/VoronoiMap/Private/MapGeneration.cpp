@@ -4,6 +4,7 @@
  */
 
 #include "MapGeneration.h"
+#include "TerrainGenerator.h"
 #include "DelaunayHelper.h"
 #include "FPoissonSampling.h"
 #include "MapNode.h"
@@ -13,6 +14,12 @@ void UMapGeneration::NativeConstruct()
 {
 	Super::NativeConstruct();
 
+	// Construct TerrainGenerator here
+	TerrainGen = new TerrainGenerator(this);
+
+	SetMapSize(FVector2D(1024, 1024));
+
+	// Generate Map
 	GenerateMap();
 }
 
@@ -71,7 +78,7 @@ void UMapGeneration::GenerateMap()
 	GenerateGraph();
 
 	// Build Terrain & Biomes
-
+	TerrainGen->GenerateTerrain();
 
 	// Build Markers & Roads
 
@@ -142,9 +149,9 @@ void UMapGeneration::GenerateGraph()
 TArray<FVector2D> UMapGeneration::GeneratePoints() const
 {
 	// Define parameters for Poisson Disk Sampling
-	constexpr int Iterations = 30; // Set the number of iterations for the sampling
-	constexpr int K = 10; // Amount of Times a Point will attempt to place
-	constexpr int Spacing = 25; // Set the Spacing Between Nodes
+	constexpr int Iterations = 20; // Set the number of iterations for the sampling
+	constexpr int K = 5; // Amount of Times a Point will attempt to place
+	constexpr int Spacing = 35; // Set the Spacing Between Nodes
 
 	// Setup the random stream
 	FRandomStream RandomStream;

@@ -225,6 +225,16 @@ int32 UInteractiveMap::NativePaint(const FPaintArgs& Args, const FGeometry& Allo
 {
 	const auto InContext = FPaintContext(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 
+	// Set the background color to blue for the ocean
+	FSlateDrawElement::MakeBox(
+		OutDrawElements,
+		LayerId - 1,
+		AllottedGeometry.ToPaintGeometry(),
+		FCoreStyle::Get().GetBrush("WhiteBrush"), // Using a white brush as a base
+		ESlateDrawEffect::None,
+		FLinearColor(0.0f, 0.4f, 0.8f, 1.0f) // Ocean blue color
+	);
+
 	// Draw the Widget Drawing Space
 	DrawWidgetBorder(InContext, AllottedGeometry);
 
