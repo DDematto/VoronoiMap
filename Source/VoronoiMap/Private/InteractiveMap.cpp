@@ -58,7 +58,7 @@ void UInteractiveMap::NativeTick(const FGeometry& MyGeometry, const float InDelt
  */
 FReply UInteractiveMap::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	constexpr float ZoomDelta = 0.1f;
+	constexpr float ZoomDelta = 0.05f;
 	ZoomLevel = FMath::Clamp(ZoomLevel + (InMouseEvent.GetWheelDelta() * ZoomDelta), 0.0f, 1.0f);
 
 	// Update the viewport size after changing the zoom level
@@ -279,26 +279,30 @@ void UInteractiveMap::DrawMapBorder(const FPaintContext& InContext, const FGeome
 
 	// Define the border width and color
 	constexpr float BorderWidth = 2.0f;
-	const FLinearColor BorderColor = FLinearColor::Black;
+	const FLinearColor BorderColor = FLinearColor::White;
 
 	// Draw the border
 	FSlateDrawElement::MakeLines(InContext.OutDrawElements, InContext.LayerId, AllottedGeometry.ToPaintGeometry(), BorderPoints,
 								 ESlateDrawEffect::None, BorderColor, true, BorderWidth);
 }
 
+////////////////////////////
+// Public Drawing Methods //
+////////////////////////////
+
 void UInteractiveMap::DrawPoint(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualPoint, const FLinearColor& Color, const FVector2D Size) const
 {
 	// Translate the virtual point to widget space
 	FVector2D WidgetSpacePoint = TranslateToWidgetSpace(VirtualPoint);
 
-	// Adjust WidgetSpacePoint to center the box on the point
+	//// Adjust WidgetSpacePoint to center the box on the point
 	WidgetSpacePoint -= Size * 0.5f;
 
-	// Create a paint geometry for the box at the widget space position
-	// Updated to use the newer API as suggested by the warning
+	//// Create a paint geometry for the box at the widget space position
+	//// Updated to use the newer API as suggested by the warning
 	const FPaintGeometry PaintGeometry = AllottedGeometry.ToPaintGeometry(Size, FSlateLayoutTransform(WidgetSpacePoint));
 
-	// Create a brush for the box
+	//// Create a brush for the box
 	FSlateBrush BoxBrush;
 	BoxBrush.TintColor = FSlateColor(Color);
 
@@ -312,7 +316,7 @@ void UInteractiveMap::DrawLine(const FPaintContext& InContext, const FGeometry& 
 	const FVector2D WidgetSpaceStartPoint = TranslateToWidgetSpace(VirtualStartPoint);
 	const FVector2D WidgetSpaceEndPoint = TranslateToWidgetSpace(VirtualEndPoint);
 
-	// Create an array of points for the line
+	//// Create an array of points for the line
 	TArray<FVector2D> LinePoints;
 	LinePoints.Add(WidgetSpaceStartPoint);
 	LinePoints.Add(WidgetSpaceEndPoint);

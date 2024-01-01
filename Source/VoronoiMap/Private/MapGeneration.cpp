@@ -5,18 +5,13 @@
 
 #include "MapGeneration.h"
 #include "DelaunayHelper.h"
-#include <algorithm>
 #include "FPoissonSampling.h"
 #include "MapNode.h"
 #include "NodeEdge.h"
-#include "VectorUtil.h"
 
- // Constructor
 void UMapGeneration::NativeConstruct()
 {
 	Super::NativeConstruct();
-
-	SetMapSize(FVector2D(500, 500));
 
 	GenerateMap();
 }
@@ -66,26 +61,63 @@ FReply UMapGeneration::NativeOnMouseButtonUp(const FGeometry& InGeometry, const 
 	return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
 }
 
-/**
- * Creates a Poisson Distribution of Points Based on MapSize
- */
-TArray<FVector2D> UMapGeneration::GeneratePoints() const
+////////////////////
+// Public Methods //
+////////////////////
+
+void UMapGeneration::GenerateMap()
 {
-	// Define parameters for Poisson Disk Sampling
-	constexpr int Iterations = 30; // Set the number of iterations for the sampling
-	constexpr int K = 5; // Amount of Times a Point will attempt to place
-	constexpr int Spacing = 50; // Set the Spacing Between Nodes
+	// Build Base Map
+	GenerateGraph();
 
-	// Setup the random stream
-	FRandomStream RandomStream;
-	RandomStream.GenerateNewSeed();
+	// Build Terrain & Biomes
 
-	// Call the Poisson Disk Sampling function with Spacing parameter
-	return FPoissonSampling::GeneratePoissonDiscSamples(MapSize.X + BoundaryOffset.X, MapSize.Y + BoundaryOffset.Y, Spacing, K, Iterations, RandomStream);
+
+	// Build Markers & Roads
+
+
+	// Build Rivers & Lakes
+
 }
 
-// Main Method For Map Generation
-void UMapGeneration::GenerateMap()
+/**
+ * Adds Invalid Nodes to Array
+ * @param Node Invalid Node
+ */
+void UMapGeneration::MarkNodeForRemoval(UMapNode* Node)
+{
+	if (Node && !InvalidNodes.Contains(Node))
+	{
+		InvalidNodes.Add(Node);
+	}
+}
+
+/**
+ * Selects a New Node
+ * @param Node Selected Node
+ */
+void UMapGeneration::SetSelectedNode(UMapNode* Node)
+{
+	if (SelectedNode != Node)
+	{
+		// Clear Previous Node to Default
+		if (SelectedNode)
+		{
+			SelectedNode->Default();
+		}
+
+		// Set the new selected node
+		Node->Selected();
+		SelectedNode = Node;
+	}
+}
+
+////////////////////////////
+// Map Generation Methods //
+////////////////////////////
+
+/// Main Method For Map Generation
+void UMapGeneration::GenerateGraph()
 {
 	Nodes.Empty();
 
@@ -95,7 +127,7 @@ void UMapGeneration::GenerateMap()
 	const FDelaunayMesh DelaunayMesh = UDelaunayHelper::CreateDelaunayTriangulation(Points);
 
 	// Dual Graph Generation
-	GenerateGraph(DelaunayMesh, Points);
+	RelateGraph(DelaunayMesh, Points);
 
 	// Try To Build Mesh, Remove Nodes Out of Bounds, And Clip Nodes in Bounds
 	for (const auto& Node : Nodes)
@@ -106,12 +138,29 @@ void UMapGeneration::GenerateMap()
 	ProcessInvalidNodes();
 }
 
-// Convert to Data Structures
-void UMapGeneration::GenerateGraph(const FDelaunayMesh& Delaunator, const TArray<FVector2D>& Points)
+// Creates a Poisson Distribution of Points Based on MapSize
+TArray<FVector2D> UMapGeneration::GeneratePoints() const
 {
-	// Clear any existing nodes to prepare for generating a new graph.
-	Nodes.Empty();
+	// Define parameters for Poisson Disk Sampling
+	constexpr int Iterations = 30; // Set the number of iterations for the sampling
+	constexpr int K = 10; // Amount of Times a Point will attempt to place
+	constexpr int Spacing = 25; // Set the Spacing Between Nodes
 
+	// Setup the random stream
+	FRandomStream RandomStream;
+	RandomStream.GenerateNewSeed();
+
+	// Call the Poisson Disk Sampling function with Spacing parameter
+	return FPoissonSampling::GeneratePoissonDiscSamples(MapSize.X + BoundaryOffset.X, MapSize.Y + BoundaryOffset.Y, Spacing, K, Iterations, RandomStream);
+}
+
+/**
+ * Relates Graph Data to Structure of Nodes & Edges
+ * @param Delaunator Delaunay Graph
+ * @param Points Poisson Random Points
+ */
+void UMapGeneration::RelateGraph(const FDelaunayMesh& Delaunator, const TArray<FVector2D>& Points)
+{
 	// Map to keep track of unique edges using triangle index pairs as keys.
 	TMap<TPair<FTriangleIndex, FTriangleIndex>, UNodeEdge*> UniqueEdgesMap;
 
@@ -218,16 +267,7 @@ void UMapGeneration::GenerateGraph(const FDelaunayMesh& Delaunator, const TArray
 	}
 }
 
-// Removal of Invalid Nodes
-
-void UMapGeneration::MarkNodeForRemoval(UMapNode* Node)
-{
-	if (Node && !InvalidNodes.Contains(Node))
-	{
-		InvalidNodes.Add(Node);
-	}
-}
-
+// Remove Invalid Nodes from Array
 void UMapGeneration::ProcessInvalidNodes()
 {
 	TArray<UNodeEdge*> EdgesToRemove;
@@ -258,4 +298,3 @@ void UMapGeneration::ProcessInvalidNodes()
 
 	InvalidNodes.Empty();
 }
-

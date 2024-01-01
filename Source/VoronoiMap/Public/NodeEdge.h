@@ -49,7 +49,6 @@ public:
 	bool bDrawB = false;
 
 	// Constructor & Initial Setup
-
 	explicit UNodeEdge(const FObjectInitializer& ObjectInitializer) : UUserWidget(ObjectInitializer) {}
 
 	void SetupEdge(const FVector2D& InPointA, const FVector2D& InPointB, UMapGeneration* InMapGenerator);
@@ -67,5 +66,4 @@ public:
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect,
 							  FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle,
 							  bool bParentEnabled) const override;
-
 };

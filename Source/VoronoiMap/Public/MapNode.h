@@ -29,6 +29,9 @@ public:
 	// Centroid of Node (Original Point)
 	FVector2D Centroid;
 
+	// Height of Node
+	float Height = 0;
+
 	// Neighboring Nodes
 	UPROPERTY()
 	TArray<UMapNode*> Neighbors;
@@ -44,19 +47,16 @@ public:
 	TArray<SlateIndex> Indices;
 
 	// Color of 2D Polygon
-	FColor PolygonColor = FColor::MakeRandomColor();
+	FColor Color = FColor::Blue;
 
 	// Color of Centroid
 	FLinearColor CentroidColor = FLinearColor::White;
-
-	// Is Node Currently Selected 
-	bool IsSelected = false;
 
 	// Is Node a Border Node
 	bool IsBorderNode = false;
 
 	// Draw Vertices Traversal
-	bool bDrawVerticesTraversal = false;
+	bool bDrawVerticesTraversal = true;
 
 	// Default constructor
 	explicit UMapNode(const FObjectInitializer& ObjectInitializer) : UUserWidget(ObjectInitializer) {}
@@ -78,6 +78,14 @@ public:
 
 	// Node Positioning Check
 	bool IsInNode(const FVector2D& Point);
+
+	/////////////////////
+	/// Node Selection //
+	/////////////////////
+
+	void Default();
+
+	void Selected();
 
 	//////////////////
 	//  Event Logic //

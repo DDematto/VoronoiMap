@@ -6,7 +6,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "MapNode.h"
 #include "Blueprint/UserWidget.h"
 #include "InteractiveMap.generated.h"
 
@@ -27,7 +26,6 @@ public:
 	// Events //
 	////////////
 
-	// Resize And Initial Load
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements,
@@ -101,9 +99,6 @@ private:
 	void UpdateViewportSize();
 	void RepositionViewportIfNeeded();
 
-	FVector2D TranslateToWidgetSpace(const FVector2D& VirtualPoint) const;
-	FVector2D TranslateToVirtualSpace(const FVector2D& ScreenPoint) const;
-
 	///////////////////////////
 	// Drawing Functionality // 
 	///////////////////////////
@@ -112,6 +107,9 @@ private:
 	void DrawMapBorder(const FPaintContext& InContext, const FGeometry& AllottedGeometry) const;
 
 public:
+	FVector2D TranslateToWidgetSpace(const FVector2D& VirtualPoint) const;
+	FVector2D TranslateToVirtualSpace(const FVector2D& ScreenPoint) const;
+
 	/////////////////////
 	// Setters/Getters //
 	/////////////////////
@@ -119,6 +117,12 @@ public:
 	void SetMapSize(FVector2D Size);
 
 	const FVector2D& GetMapSize()const { return MapSize; }
+
+	FVector2D GetMousePositionInVirtualSpace() const { return MousePositionInVirtualSpace; }
+
+	/////////////////////////////////////////////////
+	// Drawing Functionality Called to Draw to Map //
+	/////////////////////////////////////////////////
 
 	void DrawPoint(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const FVector2D& VirtualPoint,
 				   const FLinearColor& Color, const FVector2D Size) const;
@@ -131,8 +135,6 @@ public:
 	void DrawPolygon(const FPaintContext& InContext, const FGeometry& AllottedGeometry, const TArray<FVector2D>& Vertices, const TArray<
 					 SlateIndex>
 					 & Indices, const FColor& Color) const;
-
-	FVector2D GetMousePositionInVirtualSpace() const { return MousePositionInVirtualSpace; }
 };
 
 /**

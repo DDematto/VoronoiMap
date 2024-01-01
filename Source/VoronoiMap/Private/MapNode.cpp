@@ -73,7 +73,7 @@ void UMapNode::BuildMesh()
 		}
 		else if (CurrentEdge->bIsPartiallyInMap)
 		{
-			PolygonColor = FColor::Blue;
+			Color = FColor::Blue;
 			IsBorderNode = true;
 		}
 
@@ -198,6 +198,26 @@ bool UMapNode::IsInNode(const FVector2D& Point)
 	return bIsInside;
 }
 
+/////////////////////
+/// Node Selection //
+/////////////////////
+
+void UMapNode::Default()
+{
+	for (UNodeEdge* Edge : Edges)
+	{
+		Edge->Color = FLinearColor::Black;
+	}
+}
+
+void UMapNode::Selected()
+{
+	for (UNodeEdge* Edge : Edges)
+	{
+		Edge->Color = FLinearColor::Red;
+	}
+}
+
 //////////////////
 //  Event Logic //
 //////////////////
@@ -207,9 +227,9 @@ int32 UMapNode::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeo
 	if (MapGenerator)
 	{
 		auto Context = FPaintContext(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
-		MapGenerator->DrawPolygon(Context, AllottedGeometry, Vertices, Indices, PolygonColor);
+		MapGenerator->DrawPolygon(Context, AllottedGeometry, Vertices, Indices, Color);
 
-		if (IsSelected && bDrawVerticesTraversal)
+		if (MapGenerator->GetSelectedNode() == this && bDrawVerticesTraversal)
 		{
 			constexpr FLinearColor StartColor = FLinearColor(0.0f, 1.0f, 1.0f, 1.0f); // Cyan (mixture of green and blue)
 			constexpr FLinearColor EndColor = FLinearColor(1.0f, 0.0f, 0.0f, 1.0f); // Bright red
@@ -227,10 +247,10 @@ int32 UMapNode::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeo
 
 		if (MapGenerator->bDrawVoronoiEdges)
 		{
+			LayerId += 1;
 			for (const UNodeEdge* Edge : Edges)
 			{
-				const int32 SelectedLayer = IsSelected ? LayerId + 2 : LayerId + 1;
-				Edge->NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, SelectedLayer, InWidgetStyle, bParentEnabled);
+				Edge->NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 			}
 		}
 
@@ -240,7 +260,7 @@ int32 UMapNode::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeo
 			MapGenerator->DrawPoint(Context, AllottedGeometry, Centroid, CentroidColor, FVector2D(2.0f, 2.0f));
 		}
 
-		if (MapGenerator->bDrawDelaunayTriangles && IsSelected)
+		if (MapGenerator->bDrawDelaunayTriangles && MapGenerator->GetSelectedNode() == this)
 		{
 			for (const UMapNode* Neighbor : Neighbors)
 			{
@@ -255,21 +275,9 @@ int32 UMapNode::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeo
 
 FReply UMapNode::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	IsSelected = IsInNode(MapGenerator->GetMousePositionInVirtualSpace());
-
-	if (IsSelected)
+	if (IsInNode(MapGenerator->GetMousePositionInVirtualSpace()) && MapGenerator->GetSelectedNode() != this)
 	{
-		for (UNodeEdge* Edge : Edges)
-		{
-			Edge->Color = FLinearColor::White;
-		}
-	}
-	else
-	{
-		for (UNodeEdge* Edge : Edges)
-		{
-			Edge->Color = FLinearColor::Black;
-		}
+		MapGenerator->SetSelectedNode(this);
 	}
 
 	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
@@ -277,7 +285,7 @@ FReply UMapNode::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEv
 
 FReply UMapNode::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && IsSelected)
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && MapGenerator->GetSelectedNode() == this)
 	{
 		// Log Centroid
 		//UE_LOG(LogTemp, Warning, TEXT("Node Centroid: (%f, %f)"), Centroid.X, Centroid.Y);
@@ -314,7 +322,7 @@ FReply UMapNode::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPoi
 
 FReply UMapNode::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && IsSelected)
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && MapGenerator->GetSelectedNode() == this)
 	{
 
 	}
