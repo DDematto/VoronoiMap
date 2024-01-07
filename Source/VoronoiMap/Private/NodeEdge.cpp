@@ -5,7 +5,6 @@
 
 #include "NodeEdge.h"
 #include "MapGeneration.h"
-#include "MapNode.h"
 
  /**
   * Initializes the Edge
@@ -53,6 +52,57 @@ void UNodeEdge::CalculateBezier() {
 	}
 }
 
+////////////////////
+// Edge Selection //
+////////////////////
+
+void UNodeEdge::SetEdgeType(const EEdgeType NewType)
+{
+	EdgeType = NewType;
+	UpdateEdgeColor();
+}
+
+void UNodeEdge::SelectEdge()
+{
+	SelectionState = ESelectionState::Selected;
+	UpdateEdgeColor();
+}
+
+void UNodeEdge::DeselectEdge()
+{
+	SelectionState = ESelectionState::Default;
+	UpdateEdgeColor();
+}
+
+void UNodeEdge::UpdateEdgeColor()
+{
+	if (SelectionState == ESelectionState::Selected)
+	{
+		Color = FLinearColor::Red;
+	}
+	else
+	{
+		switch (EdgeType)
+		{
+		case EEdgeType::Road:
+			Color = FColor(50, 50, 50, 255); // Dark gray for roads
+			break;
+		case EEdgeType::River:
+			Color = FColor(0, 150, 255, 255); // Clear blue for rivers
+			break;
+		case EEdgeType::Cliff:
+			Color = FColor(100, 100, 100, 255); // Gray for cliffs
+			break;
+		default:
+			Color = FLinearColor(0.0f, 0.0f, 0.0f, 0.0f); // Transparent for undefined edge types
+		}
+	}
+}
+
+//////////////////
+//  Event Logic //
+//////////////////
+
 int32 UNodeEdge::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
 	auto InContext = FPaintContext(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
@@ -60,7 +110,7 @@ int32 UNodeEdge::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGe
 	if (MapGenerator)
 	{
 		// Draw Edge
-		MapGenerator->DrawLines(InContext, AllottedGeometry, BezierCurvePoints, Color, 1.0);
+		MapGenerator->DrawLines(InContext, AllottedGeometry, BezierCurvePoints, Color, 2);
 
 		// Draw Point A
 		if (bDrawA)

@@ -15,12 +15,8 @@ void UMapGeneration::NativeConstruct()
 	Super::NativeConstruct();
 
 	// Construct TerrainGenerator here
-	TerrainGen = new TerrainGenerator(this);
-
-	SetMapSize(FVector2D(1024, 1024));
-
-	// Generate Map
-	GenerateMap();
+	TerrainGen = NewObject<UTerrainGenerator>(this, UTerrainGenerator::StaticClass());
+	TerrainGen->MapGen = this;
 }
 
 //////////////////
@@ -79,12 +75,6 @@ void UMapGeneration::GenerateMap()
 
 	// Build Terrain & Biomes
 	TerrainGen->GenerateTerrain();
-
-	// Build Markers & Roads
-
-
-	// Build Rivers & Lakes
-
 }
 
 /**
@@ -148,11 +138,6 @@ void UMapGeneration::GenerateGraph()
 // Creates a Poisson Distribution of Points Based on MapSize
 TArray<FVector2D> UMapGeneration::GeneratePoints() const
 {
-	// Define parameters for Poisson Disk Sampling
-	constexpr int Iterations = 20; // Set the number of iterations for the sampling
-	constexpr int K = 5; // Amount of Times a Point will attempt to place
-	constexpr int Spacing = 35; // Set the Spacing Between Nodes
-
 	// Setup the random stream
 	FRandomStream RandomStream;
 	RandomStream.GenerateNewSeed();

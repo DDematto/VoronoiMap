@@ -14,7 +14,7 @@ class UNodeEdge;
 class UMapNode;
 struct FDelaunayMesh;
 
-class TerrainGenerator;
+class UTerrainGenerator;
 
 /**
  * Map Generation Class
@@ -41,13 +41,30 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapGeneration Stats")
 	bool bDrawVoronoiCentroids = true;
 
+	/////////////////////////////////////////////////
+	// Define parameters for Poisson Disk Sampling //
+	/////////////////////////////////////////////////
+
+	// Set the number of iterations for the sampling
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapGeneration Parameters")
+	int Iterations = 20;
+
+	// Amount of Times a Point will attempt to place 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapGeneration Parameters")
+	int K = 5;
+
+	// Set the Spacing Between Nodes
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MapGeneration Parameters")
+	int Spacing = 35;
+
 	/// Constructor   
 	explicit UMapGeneration(const FObjectInitializer& ObjectInitializer) : UInteractiveMap(ObjectInitializer) {};
 
 	virtual void NativeConstruct() override;
 
 	// Generator Modules
-	TerrainGenerator* TerrainGen = nullptr;
+	UPROPERTY(BlueprintReadWrite, Category = "MapGeneration Module")
+	UTerrainGenerator* TerrainGen = nullptr;
 
 	//////////////////
 	//  Event Logic //
@@ -75,11 +92,7 @@ public:
 
 	TArray<UMapNode*>& GetNodes() { return Nodes; }
 
-	int32 GetMapSeed() const { return MapSeed; }
-
 private:
-	// Map Seed for All Modules
-	int32 MapSeed = FMath::RandRange(0, 1000);
 
 	// Stores all Voronoi Nodes
 	UPROPERTY()

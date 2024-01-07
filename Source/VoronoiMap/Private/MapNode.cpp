@@ -4,8 +4,10 @@
  */
 
 #include "MapNode.h"
-#include "MapGeneration.h"
 #include "NodeEdge.h"
+#include "MapGeneration.h"
+#include "Biomes.h"
+#include "TerrainGenerator.h"
 #include "CompGeom/PolygonTriangulation.h"
 #include "Algo/Reverse.h"
 
@@ -193,15 +195,15 @@ bool UMapNode::IsInNode(const FVector2D& Point)
 	return bIsInside;
 }
 
-/////////////////////
-/// Node Selection //
-/////////////////////
+////////////////////
+// Node Selection //
+////////////////////
 
 void UMapNode::Default()
 {
 	for (UNodeEdge* Edge : Edges)
 	{
-		Edge->Color = FLinearColor::Black;
+		Edge->DeselectEdge();
 	}
 }
 
@@ -209,9 +211,78 @@ void UMapNode::Selected()
 {
 	for (UNodeEdge* Edge : Edges)
 	{
-		Edge->Color = FLinearColor::Red;
+		Edge->SelectEdge();
 	}
 }
+
+////////////////////
+// Biome Creation //
+////////////////////
+
+// Updates Node Based on Height & Biome Information
+void UMapNode::UpdateNode()
+{
+	const UTerrainGenerator* Terrain = MapGenerator->TerrainGen;
+
+	FColor TempColor;
+	switch (BiomeType)
+	{
+	case EBiomeType::Plains:
+		TempColor = FColor::Green;
+		break;
+	case EBiomeType::Sea:
+		TempColor = FColor(0, 102, 235, 255);
+		Height = 120;
+		break;
+	case EBiomeType::Forest:
+		TempColor = FColor(0, 128, 0, 255);
+		break;
+	}
+
+	const float NormalizedHeight = (Height - Terrain->SeaLevel) / (MapGenerator->TerrainGen->MaxHeight - MapGenerator->TerrainGen->SeaLevel);
+	const float ShadeFactor = 0.5f + 0.5f * NormalizedHeight;
+
+	// Easy Switch for now, will change later
+	if constexpr (constexpr bool bWipShowHeightMap = true)
+	{
+		Color = FColor(255 * ShadeFactor, 255 * ShadeFactor, 255 * ShadeFactor, TempColor.A);
+
+		if (BiomeType == EBiomeType::Sea)
+		{
+			Color = FColor(0, 102, 235, 255);
+		}
+
+	}
+	else
+	{
+		Color = FColor(TempColor.R * ShadeFactor, TempColor.G * ShadeFactor, TempColor.B * ShadeFactor, TempColor.A);
+	}
+}
+
+/////////////
+// Setters //
+/////////////
+
+EBiomeType UMapNode::GetBiome() const { return BiomeType; }
+
+void UMapNode::SetBiome(const EBiomeType Biome, const bool bIsUpdate)
+{
+	BiomeType = Biome;
+
+	if (bIsUpdate) UpdateNode();
+}
+
+float UMapNode::GetHeight() const { return Height; }
+
+void UMapNode::SetHeight(const float Value, const bool bIsUpdate)
+{
+	const UTerrainGenerator* Terrain = MapGenerator->TerrainGen;
+	Height = FMath::Clamp(Value, Terrain->SeaLevel, Terrain->MaxHeight);
+
+	if (bIsUpdate) UpdateNode();
+}
+
+FVector2D UMapNode::GetCentroid() const { return Centroid; }
 
 //////////////////
 //  Event Logic //
@@ -219,7 +290,7 @@ void UMapNode::Selected()
 
 int32 UMapNode::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeometry, const FSlateRect& MyCullingRect, FSlateWindowElementList& OutDrawElements, int32 LayerId, const FWidgetStyle& InWidgetStyle, bool bParentEnabled) const
 {
-	if (MapGenerator && !bIsSea)
+	if (MapGenerator)
 	{
 		auto Context = FPaintContext(AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 		MapGenerator->DrawPolygon(Context, AllottedGeometry, Vertices, Indices, Color);
@@ -245,7 +316,10 @@ int32 UMapNode::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeo
 			LayerId += 1;
 			for (const UNodeEdge* Edge : Edges)
 			{
-				Edge->NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
+				if (Edge->Nodes[0] == this)
+				{
+					Edge->NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
+				}
 			}
 		}
 
@@ -268,18 +342,13 @@ int32 UMapNode::NativePaint(const FPaintArgs& Args, const FGeometry& AllottedGeo
 	return Super::NativePaint(Args, AllottedGeometry, MyCullingRect, OutDrawElements, LayerId, InWidgetStyle, bParentEnabled);
 }
 
-FReply UMapNode::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+FReply UMapNode::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (IsInNode(MapGenerator->GetMousePositionInVirtualSpace()) && !bIsSea)
+	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && IsInNode(MapGenerator->GetMousePositionInVirtualSpace()))
 	{
 		MapGenerator->SetSelectedNode(this);
 	}
 
-	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
-}
-
-FReply UMapNode::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
 	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && MapGenerator->GetSelectedNode() == this)
 	{
 		// Log Centroid
@@ -315,12 +384,15 @@ FReply UMapNode::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPoi
 	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }
 
+FReply UMapNode::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+
+
+	return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+}
+
 FReply UMapNode::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && MapGenerator->GetSelectedNode() == this)
-	{
-
-	}
 
 	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
 }

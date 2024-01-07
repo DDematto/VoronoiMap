@@ -12,6 +12,24 @@
 class UMapGeneration;
 class UMapNode;
 
+
+UENUM(BlueprintType)
+enum class EEdgeType : uint8
+{
+	None UMETA(DisplayName = "None"),
+	Road UMETA(DisplayName = "Road"),
+	River UMETA(DisplayName = "River"),
+	Cliff UMETA(DisplayName = "Cliff")
+};
+
+
+UENUM(BlueprintType)
+enum class ESelectionState : uint8
+{
+	Default UMETA(DisplayName = "Default"),
+	Selected UMETA(DisplayName = "Selected")
+};
+
 /**
  * Base Class for Edge of Voronoi Node
  */
@@ -24,6 +42,16 @@ public:
 	UPROPERTY()
 	UMapGeneration* MapGenerator = nullptr;
 
+	UPROPERTY()
+	EEdgeType EdgeType = EEdgeType::None;
+
+	UPROPERTY()
+	ESelectionState SelectionState = ESelectionState::Default;
+
+	/// Nodes that are related to this edge
+	UPROPERTY()
+	TArray<UMapNode*> Nodes;
+
 	// Circumcenter A
 	FVector2D PointA;
 
@@ -33,9 +61,6 @@ public:
 	// Points Making up BezierCurve
 	TArray<FVector2D> BezierCurvePoints;
 
-	/// Nodes that are related to this edge
-	TArray<UMapNode*> Nodes;
-
 	// Flag if Edge is Inside Map
 	bool bIsEdgeInsideMap;
 
@@ -43,7 +68,7 @@ public:
 	bool bIsPartiallyInMap;
 
 	// Color Of Edge
-	FLinearColor Color = FLinearColor::Black;
+	FLinearColor Color;
 
 	bool bDrawA = false;
 	bool bDrawB = false;
@@ -58,6 +83,18 @@ public:
 	bool IsPointInsideMap(const FVector2D& Point) const;
 
 	void CalculateBezier();
+
+	////////////////////
+	// Edge Selection //
+	////////////////////
+
+	void SetEdgeType(EEdgeType NewType);
+
+	void SelectEdge();
+
+	void DeselectEdge();
+
+	void UpdateEdgeColor();
 
 	//////////////////
 	//  Event Logic //
